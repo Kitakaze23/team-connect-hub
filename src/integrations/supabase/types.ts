@@ -17,6 +17,8 @@ export type Database = {
       companies: {
         Row: {
           created_at: string
+          desk_sharing_enabled: boolean
+          floor_plan_url: string | null
           id: string
           invite_code: string | null
           name: string
@@ -26,6 +28,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          desk_sharing_enabled?: boolean
+          floor_plan_url?: string | null
           id?: string
           invite_code?: string | null
           name: string
@@ -35,6 +39,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          desk_sharing_enabled?: boolean
+          floor_plan_url?: string | null
           id?: string
           invite_code?: string | null
           name?: string
@@ -142,6 +148,80 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "conversations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      desk_assignments: {
+        Row: {
+          company_id: string
+          created_at: string
+          date: string
+          desk_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          date: string
+          desk_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          date?: string
+          desk_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "desk_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "desk_assignments_desk_id_fkey"
+            columns: ["desk_id"]
+            isOneToOne: false
+            referencedRelation: "desks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      desks: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "desks_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
