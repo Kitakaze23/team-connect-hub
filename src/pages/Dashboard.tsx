@@ -1,24 +1,30 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, MessageSquare, UserCircle, Bell, Search, Terminal } from "lucide-react";
+import { Users, MessageSquare, UserCircle, Terminal, Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
 import TeamView from "@/components/team/TeamView";
 import ChatView from "@/components/chat/ChatView";
 import ProfileView from "@/components/profile/ProfileView";
 import NotificationDropdown from "@/components/NotificationDropdown";
 import GlobalSearch from "@/components/GlobalSearch";
+import CompanySettings from "@/components/company/CompanySettings";
 
-type Tab = "team" | "chat" | "profile";
-
-const tabConfig = [
-  { id: "team" as Tab, label: "Команда", icon: Users },
-  { id: "chat" as Tab, label: "Чат", icon: MessageSquare },
-  { id: "profile" as Tab, label: "Профиль", icon: UserCircle },
-];
+type Tab = "team" | "chat" | "profile" | "settings";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const isMobile = useIsMobile();
+  const { membership } = useAuth();
+
+  const isAdmin = membership?.role === "admin";
+
+  const tabConfig = [
+    { id: "team" as Tab, label: "Команда", icon: Users },
+    { id: "chat" as Tab, label: "Чат", icon: MessageSquare },
+    { id: "profile" as Tab, label: "Профиль", icon: UserCircle },
+    ...(isAdmin ? [{ id: "settings" as Tab, label: "Настройки", icon: Settings }] : []),
+  ];
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -29,7 +35,7 @@ const Dashboard = () => {
             <Terminal className="w-4 h-4 text-primary-foreground" />
           </div>
           <span className="font-mono font-bold text-foreground text-lg hidden sm:inline">
-            Терминал
+            {membership?.company_name || "Терминал"}
           </span>
         </div>
 
@@ -73,6 +79,7 @@ const Dashboard = () => {
             {activeTab === "team" && <TeamView />}
             {activeTab === "chat" && <ChatView />}
             {activeTab === "profile" && <ProfileView />}
+            {activeTab === "settings" && isAdmin && <CompanySettings />}
           </motion.div>
         </AnimatePresence>
       </main>

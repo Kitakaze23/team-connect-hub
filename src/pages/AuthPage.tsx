@@ -1,31 +1,40 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, Mail, Lock, UserPlus, LogIn, Shield, User } from "lucide-react";
+import { Terminal, Mail, Lock, UserPlus, LogIn, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 type AuthMode = "login" | "register";
-type Role = "user" | "admin";
 
 const AuthPage = () => {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("user");
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock auth - will be replaced with Cloud auth
-    toast({
-      title: mode === "login" ? "Вход выполнен" : "Регистрация успешна",
-      description: `Добро пожаловать в Терминал!`,
-    });
-    navigate("/app");
+    setLoading(true);
+
+    try {
+      if (mode === "login") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast({ title: "Вход выполнен", description: "Добро пожаловать в Терминал!" });
+      } else {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        toast({ title: "Регистрация успешна", description: "Добро пожаловать в Терминал!" });
+      }
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -95,82 +104,34 @@ const AuthPage = () => {
               className="space-y-4"
             >
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </Label>
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-11 bg-secondary/50 border-border"
-                    required
+                    id="email" type="email" placeholder="your@email.com"
+                    value={email} onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 h-11 bg-secondary/50 border-border" required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Пароль
-                </Label>
+                <Label htmlFor="password" className="text-sm font-medium">Пароль</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 h-11 bg-secondary/50 border-border"
-                    required
+                    id="password" type="password" placeholder="••••••••"
+                    value={password} onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 h-11 bg-secondary/50 border-border" required
                   />
                 </div>
               </div>
 
-              {mode === "register" && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-2"
-                >
-                  <Label className="text-sm font-medium">Роль</Label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRole("user")}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-all ${
-                        role === "user"
-                          ? "border-accent bg-accent/10 text-accent"
-                          : "border-border text-muted-foreground hover:border-accent/50"
-                      }`}
-                    >
-                      <User className="w-4 h-4" />
-                      Пользователь
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole("admin")}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-all ${
-                        role === "admin"
-                          ? "border-accent bg-accent/10 text-accent"
-                          : "border-border text-muted-foreground hover:border-accent/50"
-                      }`}
-                    >
-                      <Shield className="w-4 h-4" />
-                      Администратор
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
               <Button
-                type="submit"
+                type="submit" disabled={loading}
                 className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl"
               >
+                {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                 {mode === "login" ? "Войти" : "Зарегистрироваться"}
               </Button>
             </motion.form>
