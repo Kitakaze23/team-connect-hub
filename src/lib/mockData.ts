@@ -5,7 +5,7 @@ export interface MockUser {
   middleName?: string;
   position: string;
   team: string;
-  status: "office" | "remote" | "vacation" | "sick";
+  status: "office" | "remote" | "vacation" | "sick" | "day_off";
   phone: string;
   messenger: string;
   city: string;
@@ -162,6 +162,7 @@ export const statusLabels: Record<string, string> = {
   remote: "Удалённо",
   vacation: "Отпуск",
   sick: "Больничный",
+  day_off: "Выходной",
 };
 
 export const statusColors: Record<string, string> = {
@@ -169,4 +170,5 @@ export const statusColors: Record<string, string> = {
   remote: "bg-status-remote",
   vacation: "bg-status-vacation",
   sick: "bg-status-sick",
+  day_off: "bg-status-remote",
 };

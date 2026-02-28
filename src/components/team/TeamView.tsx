@@ -6,7 +6,7 @@ import UserCardModal from "@/components/UserCardModal";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
-type StatusFilter = "all" | "office" | "remote" | "vacation" | "sick";
+type StatusFilter = "all" | "office" | "remote" | "vacation" | "sick" | "day_off";
 
 interface ProfileUser {
   id: string;
@@ -34,6 +34,7 @@ const statusIcons = {
   remote: Wifi,
   vacation: Palmtree,
   sick: Stethoscope,
+  day_off: Coffee,
 };
 
 const dayKeys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -48,7 +49,7 @@ const TeamView = () => {
   const [loading, setLoading] = useState(true);
 
   // Compute user statuses from work_schedules, vacations, sick_leaves
-  const [userStatuses, setUserStatuses] = useState<Record<string, "office" | "remote" | "vacation" | "sick">>({});
+  const [userStatuses, setUserStatuses] = useState<Record<string, "office" | "remote" | "vacation" | "sick" | "day_off">>({});
   const [userSchedules, setUserSchedules] = useState<Record<string, Record<string, string>>>({});
   const [userVacations, setUserVacations] = useState<Record<string, { start: string; end: string }[]>>({});
   const [userSickLeaves, setUserSickLeaves] = useState<Record<string, { start: string; end: string }[]>>({});
@@ -59,8 +60,17 @@ const TeamView = () => {
     if (!companyId) return;
     const fetch = async () => {
       setLoading(true);
+      // First get all approved company members
+      const { data: members } = await supabase
+        .from("company_members")
+        .select("user_id")
+        .eq("company_id", companyId)
+        .eq("status", "approved");
+
+      const memberUserIds = (members || []).map(m => m.user_id);
+
       const [profilesRes, teamsRes, schedulesRes, vacationsRes, sickRes] = await Promise.all([
-        supabase.from("profiles").select("id, user_id, first_name, last_name, middle_name, position, team, phone, messenger, city, birthday, desk, avatar_url").eq("company_id", companyId),
+        supabase.from("profiles").select("id, user_id, first_name, last_name, middle_name, position, team, phone, messenger, city, birthday, desk, avatar_url").in("user_id", memberUserIds),
         supabase.from("teams").select("id, name").eq("company_id", companyId).order("created_at"),
         supabase.from("work_schedules").select("*").eq("company_id", companyId),
         supabase.from("vacations").select("*").eq("company_id", companyId),
@@ -82,7 +92,7 @@ const TeamView = () => {
         schedMap[s.user_id] = {};
         for (const k of dayKeys) schedMap[s.user_id][k] = (s as any)[k] || "office";
         const todayVal = (s as any)[dayKey] || "office";
-        statuses[s.user_id] = todayVal === "day_off" ? "remote" : todayVal;
+        statuses[s.user_id] = todayVal === "day_off" ? "day_off" : todayVal;
       }
       setUserSchedules(schedMap);
 
@@ -124,6 +134,7 @@ const TeamView = () => {
     { id: "all", label: "Все" },
     { id: "office", label: "Офис" },
     { id: "remote", label: "Удалённо" },
+    { id: "day_off", label: "Выходной" },
     { id: "vacation", label: "Отпуск" },
     { id: "sick", label: "Больничный" },
   ];
