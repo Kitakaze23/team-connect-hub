@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Loader2, Upload, Image, Users, Calendar, X } from "lucide-react";
+import { Plus, Trash2, Loader2, Upload, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ interface DeskAssignment {
   id: string;
   desk_id: string;
   user_id: string;
-  date: string;
+  day_of_week: string;
 }
 
 interface ProfileUser {
@@ -28,6 +28,11 @@ interface ProfileUser {
   first_name: string;
   last_name: string;
 }
+
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const DAY_LABELS: Record<string, string> = {
+  mon: "Пн", tue: "Вт", wed: "Ср", thu: "Чт", fri: "Пт", sat: "Сб", sun: "Вс",
+};
 
 const DeskManagement = () => {
   const { membership } = useAuth();
@@ -41,9 +46,8 @@ const DeskManagement = () => {
   const [floorPlanUrl, setFloorPlanUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Assignment state
   const [users, setUsers] = useState<ProfileUser[]>([]);
-  const [assignDate, setAssignDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [selectedDay, setSelectedDay] = useState<string>("mon");
   const [assignments, setAssignments] = useState<DeskAssignment[]>([]);
   const [assigningDesk, setAssigningDesk] = useState<string | null>(null);
 
@@ -51,33 +55,23 @@ const DeskManagement = () => {
     if (!companyId) return;
     const fetch = async () => {
       setLoading(true);
-      const [companyRes, desksRes, usersRes] = await Promise.all([
+      const [companyRes, desksRes, usersRes, assignRes] = await Promise.all([
         supabase.from("companies").select("desk_sharing_enabled, floor_plan_url").eq("id", companyId).single(),
         supabase.from("desks").select("id, name, sort_order").eq("company_id", companyId).order("sort_order"),
         supabase.from("profiles").select("user_id, first_name, last_name").eq("company_id", companyId),
+        supabase.from("desk_assignments").select("id, desk_id, user_id, day_of_week").eq("company_id", companyId),
       ]);
       setEnabled(companyRes.data?.desk_sharing_enabled || false);
       setFloorPlanUrl(companyRes.data?.floor_plan_url || null);
       setDesks(desksRes.data || []);
       setUsers(usersRes.data || []);
+      setAssignments(assignRes.data || []);
       setLoading(false);
     };
     fetch();
   }, [companyId]);
 
-  // Load assignments when date changes
-  useEffect(() => {
-    if (!companyId || !assignDate) return;
-    const fetch = async () => {
-      const { data } = await supabase
-        .from("desk_assignments")
-        .select("id, desk_id, user_id, date")
-        .eq("company_id", companyId)
-        .eq("date", assignDate);
-      setAssignments(data || []);
-    };
-    fetch();
-  }, [companyId, assignDate]);
+  const dayAssignments = assignments.filter(a => a.day_of_week === selectedDay);
 
   const toggleEnabled = async () => {
     if (!companyId) return;
@@ -100,14 +94,9 @@ const DeskManagement = () => {
   };
 
   const deleteDesk = async (deskId: string) => {
-    // Check for assignments
-    const { count } = await supabase
-      .from("desk_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("desk_id", deskId);
-
-    if (count && count > 0) {
-      const confirmed = window.confirm(`У этого стола есть ${count} назначений. Они будут удалены. Продолжить?`);
+    const deskAssigns = assignments.filter(a => a.desk_id === deskId);
+    if (deskAssigns.length > 0) {
+      const confirmed = window.confirm(`У этого стола есть ${deskAssigns.length} назначений. Они будут удалены. Продолжить?`);
       if (!confirmed) return;
       await supabase.from("desk_assignments").delete().eq("desk_id", deskId);
     }
@@ -144,23 +133,22 @@ const DeskManagement = () => {
 
   const assignUser = async (deskId: string, userId: string) => {
     if (!companyId) return;
-    // Check if user already assigned on this date
-    const existing = assignments.find(a => a.user_id === userId);
+    // Remove existing assignment for this user on this day
+    const existing = assignments.find(a => a.user_id === userId && a.day_of_week === selectedDay);
     if (existing) {
-      // Remove old assignment
       await supabase.from("desk_assignments").delete().eq("id", existing.id);
       setAssignments(prev => prev.filter(a => a.id !== existing.id));
     }
-    // Check if desk already assigned
-    const deskExisting = assignments.find(a => a.desk_id === deskId);
+    // Remove existing assignment for this desk on this day
+    const deskExisting = assignments.find(a => a.desk_id === deskId && a.day_of_week === selectedDay);
     if (deskExisting) {
       await supabase.from("desk_assignments").delete().eq("id", deskExisting.id);
       setAssignments(prev => prev.filter(a => a.id !== deskExisting.id));
     }
     const { data, error } = await supabase
       .from("desk_assignments")
-      .insert({ company_id: companyId, desk_id: deskId, user_id: userId, date: assignDate })
-      .select("id, desk_id, user_id, date")
+      .insert({ company_id: companyId, desk_id: deskId, user_id: userId, day_of_week: selectedDay })
+      .select("id, desk_id, user_id, day_of_week")
       .single();
     if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
     if (data) setAssignments(prev => [...prev, data]);
@@ -186,7 +174,6 @@ const DeskManagement = () => {
         <Users className="w-4 h-4" /> Рассадка (Desk Sharing)
       </h3>
 
-      {/* Toggle */}
       <div className="flex items-center justify-between">
         <Label className="text-sm text-foreground">Функция рассадки</Label>
         <Switch checked={enabled} onCheckedChange={toggleEnabled} />
@@ -240,16 +227,21 @@ const DeskManagement = () => {
             </div>
           </div>
 
-          {/* Assignments */}
+          {/* Assignments by day of week */}
           {desks.length > 0 && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" /> Назначение на дату
-              </Label>
-              <Input type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} className="h-9 bg-secondary/50 w-48" />
+              <Label className="text-xs text-muted-foreground">Назначение по дням недели</Label>
+              <div className="flex gap-1 bg-secondary rounded-lg p-0.5">
+                {DAY_KEYS.map(day => (
+                  <button key={day} onClick={() => { setSelectedDay(day); setAssigningDesk(null); }}
+                    className={`px-3 py-1.5 text-xs rounded-md transition-all flex-1 ${selectedDay === day ? "bg-card text-foreground shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}>
+                    {DAY_LABELS[day]}
+                  </button>
+                ))}
+              </div>
               <div className="space-y-1 max-h-56 overflow-y-auto">
                 {desks.map(desk => {
-                  const assignment = assignments.find(a => a.desk_id === desk.id);
+                  const assignment = dayAssignments.find(a => a.desk_id === desk.id);
                   return (
                     <div key={desk.id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30">
                       <span className="text-sm font-medium text-foreground w-24 truncate">{desk.name}</span>
@@ -267,7 +259,7 @@ const DeskManagement = () => {
                               <SelectValue placeholder="Выберите сотрудника" />
                             </SelectTrigger>
                             <SelectContent>
-                              {users.filter(u => !assignments.some(a => a.user_id === u.user_id)).map(u => (
+                              {users.filter(u => !dayAssignments.some(a => a.user_id === u.user_id)).map(u => (
                                 <SelectItem key={u.user_id} value={u.user_id}>
                                   {u.first_name} {u.last_name}
                                 </SelectItem>

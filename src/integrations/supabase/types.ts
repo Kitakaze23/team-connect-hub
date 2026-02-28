@@ -159,7 +159,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
-          date: string
+          day_of_week: string
           desk_id: string
           id: string
           user_id: string
@@ -167,7 +167,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
-          date: string
+          day_of_week?: string
           desk_id: string
           id?: string
           user_id: string
@@ -175,7 +175,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
-          date?: string
+          day_of_week?: string
           desk_id?: string
           id?: string
           user_id?: string
