@@ -9,6 +9,7 @@ import PeriodDialog from "./PeriodDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +41,15 @@ const ProfileView = () => {
   const [showSchedule, setShowSchedule] = useState(false);
   const [showVacation, setShowVacation] = useState(false);
   const [showSickLeave, setShowSickLeave] = useState(false);
+  const [teamsList, setTeamsList] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!membership?.company_id) return;
+    supabase.from("teams").select("id, name").eq("company_id", membership.company_id).order("created_at").then(({ data }) => {
+      setTeamsList(data || []);
+    });
+  }, [membership?.company_id]);
+
   useEffect(() => {
     if (!user) return;
     const fetchProfile = async () => {
@@ -188,7 +198,17 @@ const ProfileView = () => {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Команда</Label>
-                  <Input value={team} onChange={(e) => setTeam(e.target.value)} placeholder="Укажите команду" className="h-9 bg-secondary/50" />
+                  <Select value={team} onValueChange={setTeam}>
+                    <SelectTrigger className="h-9 bg-secondary/50">
+                      <SelectValue placeholder="Выберите команду" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Без команды</SelectItem>
+                      {teamsList.map((t) => (
+                        <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
