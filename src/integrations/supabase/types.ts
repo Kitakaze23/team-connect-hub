@@ -343,6 +343,8 @@ export type Database = {
           fri: string
           id: string
           mon: string
+          sat: string
+          sun: string
           thu: string
           tue: string
           updated_at: string
@@ -354,6 +356,8 @@ export type Database = {
           fri?: string
           id?: string
           mon?: string
+          sat?: string
+          sun?: string
           thu?: string
           tue?: string
           updated_at?: string
@@ -365,6 +369,8 @@ export type Database = {
           fri?: string
           id?: string
           mon?: string
+          sat?: string
+          sun?: string
           thu?: string
           tue?: string
           updated_at?: string
