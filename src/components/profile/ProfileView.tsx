@@ -198,12 +198,12 @@ const ProfileView = () => {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Команда</Label>
-                  <Select value={team} onValueChange={setTeam}>
+                  <Select value={team || "__none__"} onValueChange={(v) => setTeam(v === "__none__" ? "" : v)}>
                     <SelectTrigger className="h-9 bg-secondary/50">
                       <SelectValue placeholder="Выберите команду" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Без команды</SelectItem>
+                      <SelectItem value="__none__">Без команды</SelectItem>
                       {teamsList.map((t) => (
                         <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
                       ))}
