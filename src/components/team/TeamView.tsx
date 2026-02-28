@@ -1,10 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Building2, Wifi, Palmtree, Stethoscope, Users as UsersIcon } from "lucide-react";
-import { mockUsers, mockTeams, statusLabels, statusColors, type MockUser } from "@/lib/mockData";
+import { Building2, Wifi, Palmtree, Stethoscope, Users as UsersIcon, Loader2, Coffee } from "lucide-react";
+import { statusLabels, statusColors } from "@/lib/mockData";
 import UserCardModal from "@/components/UserCardModal";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 type StatusFilter = "all" | "office" | "remote" | "vacation" | "sick";
+
+interface ProfileUser {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  middle_name?: string | null;
+  position?: string | null;
+  team?: string | null;
+  phone?: string | null;
+  messenger?: string | null;
+  city?: string | null;
+  birthday?: string | null;
+  desk?: string | null;
+  avatar_url?: string | null;
+}
+
+interface TeamRecord {
+  id: string;
+  name: string;
+}
 
 const statusIcons = {
   office: Building2,
@@ -13,22 +36,88 @@ const statusIcons = {
   sick: Stethoscope,
 };
 
+const dayKeys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
 const TeamView = () => {
+  const { membership } = useAuth();
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [selectedUser, setSelectedUser] = useState<MockUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ProfileUser | null>(null);
+  const [profiles, setProfiles] = useState<ProfileUser[]>([]);
+  const [teams, setTeams] = useState<TeamRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const teams = ["all", ...mockTeams];
+  // Compute user statuses from work_schedules, vacations, sick_leaves
+  const [userStatuses, setUserStatuses] = useState<Record<string, "office" | "remote" | "vacation" | "sick">>({});
+  const [userSchedules, setUserSchedules] = useState<Record<string, Record<string, string>>>({});
+  const [userVacations, setUserVacations] = useState<Record<string, { start: string; end: string }[]>>({});
+  const [userSickLeaves, setUserSickLeaves] = useState<Record<string, { start: string; end: string }[]>>({});
 
-  const filteredUsers = mockUsers.filter((u) => {
+  const companyId = membership?.company_id;
+
+  useEffect(() => {
+    if (!companyId) return;
+    const fetch = async () => {
+      setLoading(true);
+      const [profilesRes, teamsRes, schedulesRes, vacationsRes, sickRes] = await Promise.all([
+        supabase.from("profiles").select("id, user_id, first_name, last_name, middle_name, position, team, phone, messenger, city, birthday, desk, avatar_url").eq("company_id", companyId),
+        supabase.from("teams").select("id, name").eq("company_id", companyId).order("created_at"),
+        supabase.from("work_schedules").select("*").eq("company_id", companyId),
+        supabase.from("vacations").select("*").eq("company_id", companyId),
+        supabase.from("sick_leaves").select("*").eq("company_id", companyId),
+      ]);
+
+      setProfiles(profilesRes.data || []);
+      setTeams(teamsRes.data || []);
+
+      const today = new Date();
+      const todayStr = today.toISOString().split("T")[0];
+      const dayIndex = (today.getDay() + 6) % 7; // Mon=0
+      const dayKey = dayKeys[dayIndex];
+
+      const schedMap: Record<string, Record<string, string>> = {};
+      const statuses: Record<string, "office" | "remote" | "vacation" | "sick"> = {};
+
+      for (const s of schedulesRes.data || []) {
+        schedMap[s.user_id] = {};
+        for (const k of dayKeys) schedMap[s.user_id][k] = (s as any)[k] || "office";
+        const todayVal = (s as any)[dayKey] || "office";
+        statuses[s.user_id] = todayVal === "day_off" ? "remote" : todayVal;
+      }
+      setUserSchedules(schedMap);
+
+      const vacMap: Record<string, { start: string; end: string }[]> = {};
+      for (const v of vacationsRes.data || []) {
+        if (!vacMap[v.user_id]) vacMap[v.user_id] = [];
+        vacMap[v.user_id].push({ start: v.start_date, end: v.end_date });
+        if (v.start_date <= todayStr && v.end_date >= todayStr) statuses[v.user_id] = "vacation";
+      }
+      setUserVacations(vacMap);
+
+      const sickMap: Record<string, { start: string; end: string }[]> = {};
+      for (const s of sickRes.data || []) {
+        if (!sickMap[s.user_id]) sickMap[s.user_id] = [];
+        sickMap[s.user_id].push({ start: s.start_date, end: s.end_date });
+        if (s.start_date <= todayStr && s.end_date >= todayStr) statuses[s.user_id] = "sick";
+      }
+      setUserSickLeaves(sickMap);
+      setUserStatuses(statuses);
+      setLoading(false);
+    };
+    fetch();
+  }, [companyId]);
+
+  const getStatus = (userId: string) => userStatuses[userId] || "office";
+
+  const filteredUsers = profiles.filter((u) => {
     if (selectedTeam !== "all" && u.team !== selectedTeam) return false;
-    if (statusFilter !== "all" && u.status !== statusFilter) return false;
+    if (statusFilter !== "all" && getStatus(u.user_id) !== statusFilter) return false;
     return true;
   });
 
   const getTeamCount = (team: string) => {
-    if (team === "all") return mockUsers.length;
-    return mockUsers.filter((u) => u.team === team).length;
+    if (team === "all") return profiles.length;
+    return profiles.filter((u) => u.team === team).length;
   };
 
   const statusFilters: { id: StatusFilter; label: string }[] = [
@@ -39,12 +128,42 @@ const TeamView = () => {
     { id: "sick", label: "Больничный" },
   ];
 
+  // Convert ProfileUser to MockUser-like for UserCardModal
+  const toMockUser = (u: ProfileUser) => ({
+    id: u.id,
+    firstName: u.first_name,
+    lastName: u.last_name,
+    middleName: u.middle_name || undefined,
+    position: u.position || "",
+    team: u.team || "",
+    status: getStatus(u.user_id),
+    phone: u.phone || "",
+    messenger: u.messenger || "",
+    city: u.city || "",
+    birthday: u.birthday || "",
+    desk: u.desk || "",
+    avatar: u.avatar_url || undefined,
+    schedule: userSchedules[u.user_id] || {},
+    vacations: userVacations[u.user_id] || [],
+    sickLeaves: userSickLeaves[u.user_id] || [],
+  });
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const teamTabs = ["all", ...teams.map(t => t.name)];
+
   return (
     <div className="h-full flex flex-col">
       {/* Team tabs */}
       <div className="shrink-0 border-b border-border bg-card/50 px-4 pt-3 pb-0 overflow-x-auto">
         <div className="flex gap-1 min-w-max">
-          {teams.map((team) => (
+          {teamTabs.map((team) => (
             <button
               key={team}
               onClick={() => setSelectedTeam(team)}
@@ -67,9 +186,9 @@ const TeamView = () => {
       <div className="shrink-0 px-4 py-3 flex gap-2 overflow-x-auto">
         {statusFilters.map((sf) => {
           const Icon = sf.id !== "all" ? statusIcons[sf.id] : UsersIcon;
-          const count = mockUsers.filter((u) => {
+          const count = profiles.filter((u) => {
             if (selectedTeam !== "all" && u.team !== selectedTeam) return false;
-            if (sf.id !== "all" && u.status !== sf.id) return false;
+            if (sf.id !== "all" && getStatus(u.user_id) !== sf.id) return false;
             return true;
           }).length;
           return (
@@ -96,7 +215,8 @@ const TeamView = () => {
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         <div className="grid gap-2">
           {filteredUsers.map((user, i) => {
-            const StatusIcon = statusIcons[user.status];
+            const status = getStatus(user.user_id);
+            const StatusIcon = statusIcons[status];
             return (
               <motion.button
                 key={user.id}
@@ -106,20 +226,24 @@ const TeamView = () => {
                 onClick={() => setSelectedUser(user)}
                 className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-accent/30 hover:shadow-sm transition-all text-left w-full"
               >
-                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-sm font-mono font-bold text-foreground shrink-0">
-                  {user.firstName[0]}{user.lastName[0]}
-                </div>
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-sm font-mono font-bold text-foreground shrink-0">
+                    {user.first_name[0]}{user.last_name[0]}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">
-                    {user.lastName} {user.firstName}
+                    {user.last_name} {user.first_name}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {user.position} · {user.team}
+                    {user.position || "—"} · {user.team || "—"}
                   </p>
                 </div>
-                <div className={`status-badge ${statusColors[user.status]} text-accent-foreground`}>
+                <div className={`status-badge ${statusColors[status]} text-accent-foreground`}>
                   <StatusIcon className="w-3 h-3" />
-                  <span className="hidden sm:inline">{statusLabels[user.status]}</span>
+                  <span className="hidden sm:inline">{statusLabels[status]}</span>
                 </div>
               </motion.button>
             );
@@ -135,7 +259,7 @@ const TeamView = () => {
       </div>
 
       {selectedUser && (
-        <UserCardModal user={selectedUser} onClose={() => setSelectedUser(null)} />
+        <UserCardModal user={toMockUser(selectedUser)} onClose={() => setSelectedUser(null)} />
       )}
     </div>
   );

@@ -188,7 +188,7 @@ const ProfileView = () => {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Команда</Label>
-                  <Input value={team} onChange={(e) => setTeam(e.target.value)} className="h-9 bg-secondary/50" />
+                  <Input value={team} onChange={(e) => setTeam(e.target.value)} placeholder="Укажите команду" className="h-9 bg-secondary/50" />
                 </div>
               </div>
             </div>

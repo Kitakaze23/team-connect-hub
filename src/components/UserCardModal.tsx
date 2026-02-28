@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Building2, Wifi, Palmtree, Stethoscope, Phone, MessageCircle, MapPin, Cake, Monitor, CalendarDays } from "lucide-react";
+import { Building2, Wifi, Palmtree, Stethoscope, Phone, MessageCircle, MapPin, Cake, Monitor, CalendarDays, Coffee } from "lucide-react";
 import { type MockUser, statusLabels, statusColors } from "@/lib/mockData";
 
 const statusIcons = {
@@ -10,7 +10,7 @@ const statusIcons = {
 };
 
 const dayNames: Record<string, string> = {
-  mon: "Пн", tue: "Вт", wed: "Ср", thu: "Чт", fri: "Пт",
+  mon: "Пн", tue: "Вт", wed: "Ср", thu: "Чт", fri: "Пт", sat: "Сб", sun: "Вс",
 };
 
 interface Props {
@@ -73,16 +73,26 @@ const UserCardModal = ({ user, onClose }: Props) => {
           <div>
             <p className="text-xs font-mono font-medium text-muted-foreground mb-2">Режим работы</p>
             <div className="flex gap-1.5">
-              {Object.entries(dayNames).map(([key, label]) => (
-                <div key={key} className="text-center">
-                  <span className="text-[10px] text-muted-foreground">{label}</span>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mt-0.5 ${
-                    user.schedule[key] === "office" ? "bg-status-office/15 text-status-office" : "bg-status-remote/15 text-status-remote"
-                  }`}>
-                    {user.schedule[key] === "office" ? <Building2 className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
+              {Object.entries(dayNames).map(([key, label]) => {
+                const val = user.schedule[key] || "office";
+                const isOffice = val === "office";
+                const isRemote = val === "remote";
+                const isDayOff = val === "day_off";
+                return (
+                  <div key={key} className="text-center">
+                    <span className="text-[10px] text-muted-foreground">{label}</span>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mt-0.5 ${
+                      isOffice ? "bg-status-office/15 text-status-office" :
+                      isRemote ? "bg-status-remote/15 text-status-remote" :
+                      "bg-muted/30 text-muted-foreground"
+                    }`}>
+                      {isOffice ? <Building2 className="w-3.5 h-3.5" /> :
+                       isRemote ? <Wifi className="w-3.5 h-3.5" /> :
+                       <Coffee className="w-3.5 h-3.5" />}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

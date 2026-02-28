@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2 } from "lucide-react";
+import TeamManagement from "./TeamManagement";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -254,6 +255,9 @@ const CompanySettings = () => {
             </div>
           ))}
         </motion.div>
+
+        {/* Team management */}
+        <TeamManagement />
       </div>
     </div>
   );
