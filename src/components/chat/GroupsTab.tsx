@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Send, Plus, ArrowLeft, Loader2, Pin, Users, Check } from "lucide-react";
+import { Send, Plus, ArrowLeft, Loader2, Pin, Users, Check, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import GroupSettingsDialog from "./GroupSettingsDialog";
 
 interface GroupConversation {
   id: string;
@@ -45,6 +46,7 @@ const GroupsTab = () => {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -195,11 +197,28 @@ const GroupsTab = () => {
           <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
             <Users className="w-4 h-4 text-accent" />
           </div>
-          <div>
+          <div className="flex-1">
             <span className="text-sm font-medium text-foreground">{activeGroup.name}</span>
             <span className="text-xs text-muted-foreground ml-2">{activeGroup.member_count} уч.</span>
           </div>
+          <button onClick={() => setSettingsOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors">
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
+        <GroupSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          group={activeGroup}
+          onGroupDeleted={(id) => {
+            setGroups(prev => prev.filter(g => g.id !== id));
+            setActiveGroup(null);
+            setMessages([]);
+          }}
+          onGroupUpdated={(id, name, count) => {
+            setGroups(prev => prev.map(g => g.id === id ? { ...g, name, member_count: count } : g));
+            setActiveGroup(prev => prev ? { ...prev, member_count: count } : prev);
+          }}
+        />
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
           {messages.map((msg) => {
             const isOwn = msg.user_id === user?.id;
