@@ -12,7 +12,7 @@ export interface MockUser {
   birthday: string;
   desk: string;
   avatar?: string;
-  schedule: Record<string, "office" | "remote">;
+  schedule: Record<string, string>;
   vacations: { start: string; end: string }[];
   sickLeaves: { start: string; end: string }[];
 }
