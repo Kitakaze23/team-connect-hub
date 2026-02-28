@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Building2, Wifi, Palmtree, Stethoscope, Users as UsersIcon, Loader2, Coffee } from "lucide-react";
+import { Building2, Wifi, Palmtree, Stethoscope, Users as UsersIcon, Loader2, Coffee, Monitor } from "lucide-react";
 import { statusLabels, statusColors } from "@/lib/mockData";
 import UserCardModal from "@/components/UserCardModal";
+import DeskSharingView from "./DeskSharingView";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -47,6 +49,8 @@ const TeamView = () => {
   const [profiles, setProfiles] = useState<ProfileUser[]>([]);
   const [teams, setTeams] = useState<TeamRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deskSharingEnabled, setDeskSharingEnabled] = useState(false);
+  const [showDeskView, setShowDeskView] = useState(false);
 
   // Compute user statuses from work_schedules, vacations, sick_leaves
   const [userStatuses, setUserStatuses] = useState<Record<string, "office" | "remote" | "vacation" | "sick" | "day_off">>({});
@@ -69,16 +73,18 @@ const TeamView = () => {
 
       const memberUserIds = (members || []).map(m => m.user_id);
 
-      const [profilesRes, teamsRes, schedulesRes, vacationsRes, sickRes] = await Promise.all([
+      const [profilesRes, teamsRes, schedulesRes, vacationsRes, sickRes, companyRes] = await Promise.all([
         supabase.from("profiles").select("id, user_id, first_name, last_name, middle_name, position, team, phone, messenger, city, birthday, desk, avatar_url").in("user_id", memberUserIds),
         supabase.from("teams").select("id, name").eq("company_id", companyId).order("created_at"),
         supabase.from("work_schedules").select("*").eq("company_id", companyId),
         supabase.from("vacations").select("*").eq("company_id", companyId),
         supabase.from("sick_leaves").select("*").eq("company_id", companyId),
+        supabase.from("companies").select("desk_sharing_enabled").eq("id", companyId).single(),
       ]);
 
       setProfiles(profilesRes.data || []);
       setTeams(teamsRes.data || []);
+      setDeskSharingEnabled(companyRes.data?.desk_sharing_enabled || false);
 
       const today = new Date();
       const todayStr = today.toISOString().split("T")[0];
@@ -167,13 +173,17 @@ const TeamView = () => {
     );
   }
 
+  if (showDeskView) {
+    return <DeskSharingView onBack={() => setShowDeskView(false)} />;
+  }
+
   const teamTabs = ["all", ...teams.map(t => t.name)];
 
   return (
     <div className="h-full flex flex-col">
-      {/* Team tabs */}
+      {/* Team tabs + Desk button */}
       <div className="shrink-0 border-b border-border bg-card/50 px-4 pt-3 pb-0 overflow-x-auto">
-        <div className="flex gap-1 min-w-max">
+        <div className="flex gap-1 min-w-max items-center">
           {teamTabs.map((team) => (
             <button
               key={team}
@@ -190,6 +200,13 @@ const TeamView = () => {
               </span>
             </button>
           ))}
+          {deskSharingEnabled && (
+            <button onClick={() => setShowDeskView(true)}
+              className="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-accent hover:text-accent/80 transition-all whitespace-nowrap flex items-center gap-1.5 ml-2">
+              <Monitor className="w-3.5 h-3.5" />
+              Рассадка
+            </button>
+          )}
         </div>
       </div>
 
