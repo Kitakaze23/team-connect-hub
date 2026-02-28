@@ -249,6 +249,41 @@ export type Database = {
           },
         ]
       }
+      sick_leaves: {
+        Row: {
+          company_id: string
+          created_at: string
+          end_date: string
+          id: string
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sick_leaves_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -266,6 +301,85 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vacations: {
+        Row: {
+          company_id: string
+          created_at: string
+          end_date: string
+          id: string
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_schedules: {
+        Row: {
+          company_id: string
+          fri: string
+          id: string
+          mon: string
+          thu: string
+          tue: string
+          updated_at: string
+          user_id: string
+          wed: string
+        }
+        Insert: {
+          company_id: string
+          fri?: string
+          id?: string
+          mon?: string
+          thu?: string
+          tue?: string
+          updated_at?: string
+          user_id: string
+          wed?: string
+        }
+        Update: {
+          company_id?: string
+          fri?: string
+          id?: string
+          mon?: string
+          thu?: string
+          tue?: string
+          updated_at?: string
+          user_id?: string
+          wed?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

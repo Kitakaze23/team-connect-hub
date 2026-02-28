@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Camera, Phone, MessageCircle, MapPin, Cake, Monitor,
-  Building2, Wifi, Save, LogOut, Loader2
+  Building2, Wifi, Save, LogOut, Loader2, CalendarDays, Stethoscope
 } from "lucide-react";
+import WorkScheduleDialog from "./WorkScheduleDialog";
+import PeriodDialog from "./PeriodDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -35,7 +37,9 @@ const ProfileView = () => {
   const [birthday, setBirthday] = useState("");
   const [desk, setDesk] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
-
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [showVacation, setShowVacation] = useState(false);
+  const [showSickLeave, setShowSickLeave] = useState(false);
   useEffect(() => {
     if (!user) return;
     const fetchProfile = async () => {
@@ -227,7 +231,44 @@ const ProfileView = () => {
           </Button>
         </motion.div>
 
-        {/* Logout */}
+        {/* Block 3: Schedule / Vacation / Sick leave */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="bg-card border border-border rounded-2xl p-6"
+        >
+          <h3 className="text-sm font-mono font-semibold text-foreground mb-3">Расписание и отсутствия</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <button
+              onClick={() => setShowSchedule(true)}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:bg-secondary/50 transition-colors"
+            >
+              <Building2 className="w-6 h-6 text-status-office" />
+              <span className="text-xs font-medium text-foreground">Режим работы</span>
+            </button>
+            <button
+              onClick={() => setShowVacation(true)}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:bg-secondary/50 transition-colors"
+            >
+              <CalendarDays className="w-6 h-6 text-status-vacation" />
+              <span className="text-xs font-medium text-foreground">Отпуск</span>
+            </button>
+            <button
+              onClick={() => setShowSickLeave(true)}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:bg-secondary/50 transition-colors"
+            >
+              <Stethoscope className="w-6 h-6 text-status-sick" />
+              <span className="text-xs font-medium text-foreground">Больничный</span>
+            </button>
+          </div>
+        </motion.div>
+
+        <WorkScheduleDialog open={showSchedule} onOpenChange={setShowSchedule} />
+        <PeriodDialog open={showVacation} onOpenChange={setShowVacation} title="Отпуска" table="vacations" />
+        <PeriodDialog open={showSickLeave} onOpenChange={setShowSickLeave} title="Больничные" table="sick_leaves" />
+
+
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
