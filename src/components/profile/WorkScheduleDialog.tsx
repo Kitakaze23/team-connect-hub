@@ -1,16 +1,24 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Building2, Wifi, Save, Loader2 } from "lucide-react";
+import { Building2, Wifi, Save, Loader2, Coffee } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 const dayLabels: Record<string, string> = {
-  mon: "Понедельник", tue: "Вторник", wed: "Среда", thu: "Четверг", fri: "Пятница",
+  mon: "Понедельник", tue: "Вторник", wed: "Среда", thu: "Четверг", fri: "Пятница", sat: "Суббота", sun: "Воскресенье",
 };
 
-type DayValue = "office" | "remote";
+type DayValue = "office" | "remote" | "day_off";
+
+const cycleOrder: DayValue[] = ["office", "remote", "day_off"];
+
+const dayConfig: Record<DayValue, { icon: typeof Building2; label: string; className: string }> = {
+  office: { icon: Building2, label: "Офис", className: "bg-status-office/15 text-status-office" },
+  remote: { icon: Wifi, label: "Удалённо", className: "bg-status-remote/15 text-status-remote" },
+  day_off: { icon: Coffee, label: "Выходной", className: "bg-muted text-muted-foreground" },
+};
 
 interface Props {
   open: boolean;
@@ -23,7 +31,7 @@ const WorkScheduleDialog = ({ open, onOpenChange }: Props) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<Record<string, DayValue>>({
-    mon: "office", tue: "office", wed: "office", thu: "office", fri: "office",
+    mon: "office", tue: "office", wed: "office", thu: "office", fri: "office", sat: "day_off", sun: "day_off",
   });
   const [existingId, setExistingId] = useState<string | null>(null);
 
@@ -37,7 +45,7 @@ const WorkScheduleDialog = ({ open, onOpenChange }: Props) => {
         .eq("user_id", user.id)
         .maybeSingle();
       if (data) {
-        setSchedule({ mon: data.mon as DayValue, tue: data.tue as DayValue, wed: data.wed as DayValue, thu: data.thu as DayValue, fri: data.fri as DayValue });
+        setSchedule({ mon: data.mon as DayValue, tue: data.tue as DayValue, wed: data.wed as DayValue, thu: data.thu as DayValue, fri: data.fri as DayValue, sat: data.sat as DayValue, sun: data.sun as DayValue });
         setExistingId(data.id);
       } else {
         setExistingId(null);
@@ -48,7 +56,11 @@ const WorkScheduleDialog = ({ open, onOpenChange }: Props) => {
   }, [open, user]);
 
   const toggle = (day: string) => {
-    setSchedule(prev => ({ ...prev, [day]: prev[day] === "office" ? "remote" : "office" }));
+    setSchedule(prev => {
+      const current = prev[day];
+      const nextIndex = (cycleOrder.indexOf(current) + 1) % cycleOrder.length;
+      return { ...prev, [day]: cycleOrder[nextIndex] };
+    });
   };
 
   const handleSave = async () => {
@@ -89,13 +101,9 @@ const WorkScheduleDialog = ({ open, onOpenChange }: Props) => {
                 className="w-full flex items-center justify-between p-3 rounded-xl border border-border hover:bg-secondary/50 transition-colors"
               >
                 <span className="text-sm font-medium text-foreground">{label}</span>
-                <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg ${
-                  schedule[key] === "office"
-                    ? "bg-status-office/15 text-status-office"
-                    : "bg-status-remote/15 text-status-remote"
-                }`}>
-                  {schedule[key] === "office" ? <Building2 className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
-                  {schedule[key] === "office" ? "Офис" : "Удалённо"}
+                <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg ${dayConfig[schedule[key]].className}`}>
+                  {(() => { const Icon = dayConfig[schedule[key]].icon; return <Icon className="w-3.5 h-3.5" />; })()}
+                  {dayConfig[schedule[key]].label}
                 </div>
               </button>
             ))}
