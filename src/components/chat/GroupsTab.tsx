@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GroupSettingsDialog from "./GroupSettingsDialog";
+import CallButtons from "@/components/call/CallButtons";
 
 interface GroupConversation {
   id: string;
@@ -201,6 +202,11 @@ const GroupsTab = () => {
             <span className="text-sm font-medium text-foreground">{activeGroup.name}</span>
             <span className="text-xs text-muted-foreground ml-2">{activeGroup.member_count} уч.</span>
           </div>
+          <CallButtons
+            conversationId={activeGroup.id}
+            targetUsers={[]}
+            isGroup
+          />
           <button onClick={() => setSettingsOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors">
             <Settings className="w-5 h-5" />
           </button>
