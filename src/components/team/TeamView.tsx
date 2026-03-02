@@ -148,6 +148,7 @@ const TeamView = () => {
   // Convert ProfileUser to MockUser-like for UserCardModal
   const toMockUser = (u: ProfileUser) => ({
     id: u.id,
+    userId: u.user_id,
     firstName: u.first_name,
     lastName: u.last_name,
     middleName: u.middle_name || undefined,

@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { Send, Pin, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserCard } from "@/hooks/useUserCard";
+import UserCardModal from "@/components/UserCardModal";
 
 interface Message {
   id: string;
@@ -20,6 +22,7 @@ const GeneralChat = () => {
   const [loading, setLoading] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { cardUser, openCard, closeCard } = useUserCard();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -124,15 +127,17 @@ const GeneralChat = () => {
               className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}
             >
               {msg.profile?.avatar_url ? (
-                <img src={msg.profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: msg.profile.avatar_url })} className="shrink-0">
+                  <img src={msg.profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all" />
+                </button>
               ) : (
-                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-mono font-bold text-foreground shrink-0">
+                <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: null })} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-mono font-bold text-foreground shrink-0 cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all">
                   {initials}
-                </div>
+                </button>
               )}
               <div className={`max-w-[75%] ${isOwn ? "items-end" : ""}`}>
                 <div className={`flex items-center gap-2 mb-0.5 ${isOwn ? "justify-end" : ""}`}>
-                  <span className="text-xs font-medium text-foreground">{displayName}</span>
+                  <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: msg.profile.avatar_url || null })} className="text-xs font-medium text-foreground hover:text-accent transition-colors cursor-pointer">{displayName}</button>
                   <span className="text-[10px] text-muted-foreground">
                     {new Date(msg.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
                   </span>
@@ -167,6 +172,8 @@ const GeneralChat = () => {
           </button>
         </div>
       </form>
+
+      {cardUser && <UserCardModal user={cardUser} onClose={closeCard} />}
     </>
   );
 };

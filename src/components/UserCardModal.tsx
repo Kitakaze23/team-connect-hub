@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Building2, Wifi, Palmtree, Stethoscope, Phone, MessageCircle, MapPin, Cake, Monitor, CalendarDays, Coffee } from "lucide-react";
+import { Building2, Wifi, Palmtree, Stethoscope, Phone, MessageCircle, MapPin, Cake, Monitor, CalendarDays, Coffee, Video, PhoneCall, Loader2 } from "lucide-react";
 import { type MockUser, statusLabels, statusColors } from "@/lib/mockData";
+import { useCall } from "@/contexts/CallContext";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const statusIcons = {
   office: Building2,
@@ -20,6 +24,68 @@ interface Props {
 
 const UserCardModal = ({ user, onClose }: Props) => {
   const StatusIcon = statusIcons[user.status];
+  const { startCall, callState } = useCall();
+  const { user: currentUser, membership } = useAuth();
+  const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
+
+  const targetUserId = user.userId;
+  const isSelf = currentUser?.id === targetUserId;
+
+  const handleCall = async (type: "audio" | "video") => {
+    if (!targetUserId || !currentUser || !membership || isSelf || callState !== "idle") return;
+    setCallingType(type);
+
+    try {
+      // Find or create DM conversation
+      const { data: convs } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("company_id", membership.company_id)
+        .eq("type", "direct");
+
+      let convId: string | null = null;
+
+      if (convs) {
+        for (const conv of convs) {
+          const { data: members } = await supabase
+            .from("conversation_members")
+            .select("user_id")
+            .eq("conversation_id", conv.id);
+          const uids = members?.map(m => m.user_id) || [];
+          if (uids.length === 2 && uids.includes(currentUser.id) && uids.includes(targetUserId)) {
+            convId = conv.id;
+            break;
+          }
+        }
+      }
+
+      if (!convId) {
+        const { data: newConv } = await supabase
+          .from("conversations")
+          .insert({ company_id: membership.company_id, type: "direct", name: null, created_by: currentUser.id })
+          .select("id")
+          .single();
+        if (!newConv) { setCallingType(null); return; }
+        convId = newConv.id;
+        await supabase.from("conversation_members").insert([
+          { conversation_id: convId, user_id: currentUser.id },
+          { conversation_id: convId, user_id: targetUserId },
+        ]);
+      }
+
+      await startCall(convId, type, [{
+        userId: targetUserId,
+        name: `${user.firstName} ${user.lastName}`,
+        avatarUrl: user.avatar || null,
+      }], false);
+
+      onClose();
+    } catch {
+      // ignore
+    } finally {
+      setCallingType(null);
+    }
+  };
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -30,10 +96,14 @@ const UserCardModal = ({ user, onClose }: Props) => {
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center text-lg font-mono font-bold text-foreground">
-              {user.firstName[0]}{user.lastName[0]}
-            </div>
-            <div>
+            {user.avatar ? (
+              <img src={user.avatar} alt="" className="w-14 h-14 rounded-2xl object-cover shrink-0" />
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center text-lg font-mono font-bold text-foreground">
+                {user.firstName[0]}{user.lastName[0]}
+              </div>
+            )}
+            <div className="flex-1">
               <p className="font-medium text-foreground">
                 {user.lastName} {user.firstName} {user.middleName || ""}
               </p>
@@ -44,6 +114,28 @@ const UserCardModal = ({ user, onClose }: Props) => {
               </div>
             </div>
           </div>
+
+          {/* Call buttons */}
+          {targetUserId && !isSelf && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleCall("audio")}
+                disabled={callState !== "idle" || !!callingType}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent/10 text-accent hover:bg-accent/20 transition-colors text-sm font-medium disabled:opacity-40"
+              >
+                {callingType === "audio" ? <Loader2 className="w-4 h-4 animate-spin" /> : <PhoneCall className="w-4 h-4" />}
+                Аудиозвонок
+              </button>
+              <button
+                onClick={() => handleCall("video")}
+                disabled={callState !== "idle" || !!callingType}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent/10 text-accent hover:bg-accent/20 transition-colors text-sm font-medium disabled:opacity-40"
+              >
+                {callingType === "video" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />}
+                Видеозвонок
+              </button>
+            </div>
+          )}
 
           {/* Info */}
           <div className="space-y-2 text-sm">
@@ -77,7 +169,6 @@ const UserCardModal = ({ user, onClose }: Props) => {
                 const val = user.schedule[key] || "office";
                 const isOffice = val === "office";
                 const isRemote = val === "remote";
-                const isDayOff = val === "day_off";
                 return (
                   <div key={key} className="text-center">
                     <span className="text-[10px] text-muted-foreground">{label}</span>
