@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GroupSettingsDialog from "./GroupSettingsDialog";
 import CallButtons from "@/components/call/CallButtons";
+import { useUserCard } from "@/hooks/useUserCard";
+import UserCardModal from "@/components/UserCardModal";
 
 interface GroupConversation {
   id: string;
@@ -39,6 +41,7 @@ const GroupsTab = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const { cardUser, openCard, closeCard } = useUserCard();
 
   // Create group state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -234,15 +237,17 @@ const GroupsTab = () => {
               <motion.div key={msg.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}>
                 {msg.profile?.avatar_url ? (
-                  <img src={msg.profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                  <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: msg.profile.avatar_url })} className="shrink-0">
+                    <img src={msg.profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all" />
+                  </button>
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-mono font-bold text-foreground shrink-0">
+                  <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: null })} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-mono font-bold text-foreground shrink-0 cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all">
                     {initials}
-                  </div>
+                  </button>
                 )}
                 <div className={`max-w-[75%]`}>
                   <div className={`flex items-center gap-2 mb-0.5 ${isOwn ? "justify-end" : ""}`}>
-                    <span className="text-xs font-medium text-foreground">{displayName}</span>
+                    <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: msg.profile.avatar_url || null })} className="text-xs font-medium text-foreground hover:text-accent transition-colors cursor-pointer">{displayName}</button>
                     <span className="text-[10px] text-muted-foreground">
                       {new Date(msg.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
                     </span>
@@ -269,10 +274,10 @@ const GroupsTab = () => {
             </button>
           </div>
         </form>
+        {cardUser && <UserCardModal user={cardUser} onClose={closeCard} />}
       </>
     );
   }
-
   // Groups list
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">

@@ -1,5 +1,6 @@
 export interface MockUser {
   id: string;
+  userId?: string; // auth user id for calls
   firstName: string;
   lastName: string;
   middleName?: string;
