@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import CallButtons from "@/components/call/CallButtons";
 
 interface DirectConversation {
   id: string;
@@ -198,6 +199,16 @@ const DirectTab = () => {
             </div>
           )}
           <span className="text-sm font-medium text-foreground">{activeConv.other_first_name} {activeConv.other_last_name}</span>
+          <div className="ml-auto">
+            <CallButtons
+              conversationId={activeConv.id}
+              targetUsers={[{
+                userId: activeConv.other_user_id,
+                name: `${activeConv.other_first_name} ${activeConv.other_last_name}`,
+                avatarUrl: activeConv.other_avatar_url,
+              }]}
+            />
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
           {messages.map((msg) => {

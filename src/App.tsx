@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { CallProvider } from "@/contexts/CallContext";
+import CallOverlay from "@/components/call/CallOverlay";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import CompanySetup from "./pages/CompanySetup";
@@ -24,7 +26,6 @@ const AppRoutes = () => {
     );
   }
 
-  // Not logged in
   if (!user) {
     return (
       <Routes>
@@ -34,7 +35,6 @@ const AppRoutes = () => {
     );
   }
 
-  // Logged in but no company membership at all
   if (!membership) {
     return (
       <Routes>
@@ -43,7 +43,6 @@ const AppRoutes = () => {
     );
   }
 
-  // Has membership but pending or rejected
   if (membership.status !== "approved") {
     return (
       <Routes>
@@ -52,13 +51,15 @@ const AppRoutes = () => {
     );
   }
 
-  // Approved member
   return (
-    <Routes>
-      <Route path="/app" element={<Dashboard />} />
-      <Route path="/" element={<Navigate to="/app" replace />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <CallProvider>
+      <CallOverlay />
+      <Routes>
+        <Route path="/app" element={<Dashboard />} />
+        <Route path="/" element={<Navigate to="/app" replace />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </CallProvider>
   );
 };
 
