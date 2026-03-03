@@ -15,6 +15,7 @@ interface AuthContextType {
   loading: boolean;
   membership: CompanyMembership | null;
   membershipLoading: boolean;
+  isPlatformAdmin: boolean;
   signOut: () => Promise<void>;
   refreshMembership: () => Promise<void>;
 }
@@ -27,6 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [membership, setMembership] = useState<CompanyMembership | null>(null);
   const [membershipLoading, setMembershipLoading] = useState(true);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   const fetchMembership = async (userId: string) => {
     setMembershipLoading(true);
@@ -68,17 +70,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user) await fetchMembership(user.id);
   };
 
+  const checkPlatformAdmin = async (userId: string) => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "platform_admin")
+      .maybeSingle();
+    setIsPlatformAdmin(!!data);
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          // Use setTimeout to avoid Supabase deadlock
-          setTimeout(() => fetchMembership(session.user.id), 0);
+          setTimeout(() => {
+            fetchMembership(session.user.id);
+            checkPlatformAdmin(session.user.id);
+          }, 0);
         } else {
           setMembership(null);
           setMembershipLoading(false);
+          setIsPlatformAdmin(false);
         }
         setLoading(false);
       }
@@ -89,6 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchMembership(session.user.id);
+        checkPlatformAdmin(session.user.id);
       } else {
         setMembershipLoading(false);
       }
@@ -115,10 +131,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     await supabase.auth.signOut();
     setMembership(null);
+    setIsPlatformAdmin(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, membership, membershipLoading, signOut, refreshMembership }}>
+    <AuthContext.Provider value={{ user, session, loading, membership, membershipLoading, isPlatformAdmin, signOut, refreshMembership }}>
       {children}
     </AuthContext.Provider>
   );
