@@ -10,13 +10,15 @@ import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import CompanySetup from "./pages/CompanySetup";
 import PendingApproval from "./pages/PendingApproval";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { user, loading, membership, membershipLoading } = useAuth();
+  const { user, loading, membership, membershipLoading, isPlatformAdmin } = useAuth();
 
   if (loading || membershipLoading) {
     return (
@@ -26,10 +28,21 @@ const AppRoutes = () => {
     );
   }
 
+  // Platform admin — only admin dashboard
+  if (user && isPlatformAdmin) {
+    return (
+      <Routes>
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+      </Routes>
+    );
+  }
+
   if (!user) {
     return (
       <Routes>
         <Route path="/" element={<AuthPage />} />
+        <Route path="/admin" element={<AdminLogin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
