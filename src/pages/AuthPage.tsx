@@ -139,7 +139,7 @@ const AuthPage = () => {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          <span className="font-mono text-accent">@Kitakaze23</span> Терминал v1.0 — Координация команды
+          Терминал v1.0 — Координация команды <span className="font-mono text-accent">@Kitakaze23</span>
         </p>
       </motion.div>
     </div>
