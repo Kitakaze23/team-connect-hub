@@ -456,7 +456,8 @@ export default function BacklogView() {
                 const x = getX(m.date);
                 if (x < 0 || x > totalWidth) return null;
                 const color = MILESTONE_COLORS[m.milestone_type] || "hsl(var(--accent))";
-                const label = MILESTONE_TYPES[m.milestone_type] || m.name;
+                const defaultLabel = MILESTONE_TYPES[m.milestone_type] || "";
+                const label = m.name && m.name !== defaultLabel ? m.name : defaultLabel;
                 return (
                   <div
                     key={m.id}
