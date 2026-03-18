@@ -227,6 +227,7 @@ export default function BacklogView() {
             <SelectItem value="year">Год</SelectItem>
           </SelectContent>
         </Select>
+        <BacklogStats tasks={tasks} />
         {isAdmin && (
           <>
             <Button size="sm" variant="outline" onClick={() => setCreateMilestoneOpen(true)}>
