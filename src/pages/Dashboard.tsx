@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, MessageSquare, UserCircle, Terminal, Settings } from "lucide-react";
+import { Users, MessageSquare, UserCircle, Terminal, Settings, LayoutList } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import TeamView from "@/components/team/TeamView";
 import ChatView from "@/components/chat/ChatView";
 import ProfileView from "@/components/profile/ProfileView";
+import BacklogView from "@/components/backlog/BacklogView";
 import NotificationDropdown from "@/components/NotificationDropdown";
 import GlobalSearch from "@/components/GlobalSearch";
 import CompanySettings from "@/components/company/CompanySettings";
 
-type Tab = "team" | "chat" | "profile" | "settings";
+type Tab = "team" | "chat" | "profile" | "settings" | "backlog";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<Tab>("chat");
@@ -22,6 +23,7 @@ const Dashboard = () => {
   const tabConfig = [
     { id: "team" as Tab, label: "Команда", icon: Users },
     { id: "chat" as Tab, label: "Чат", icon: MessageSquare },
+    { id: "backlog" as Tab, label: "Бэклог", icon: LayoutList },
     { id: "profile" as Tab, label: "Профиль", icon: UserCircle },
     ...(isAdmin ? [{ id: "settings" as Tab, label: "Настройки", icon: Settings }] : []),
   ];
@@ -78,6 +80,7 @@ const Dashboard = () => {
           >
             {activeTab === "team" && <TeamView />}
             {activeTab === "chat" && <ChatView />}
+            {activeTab === "backlog" && <BacklogView />}
             {activeTab === "profile" && <ProfileView />}
             {activeTab === "settings" && isAdmin && <CompanySettings />}
           </motion.div>

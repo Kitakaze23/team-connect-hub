@@ -44,6 +44,225 @@ export type Database = {
         }
         Relationships: []
       }
+      backlog_milestones: {
+        Row: {
+          company_id: string
+          created_at: string
+          date: string
+          id: string
+          milestone_type: string
+          name: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          date: string
+          id?: string
+          milestone_type?: string
+          name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          milestone_type?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backlog_milestones_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backlog_stage_links: {
+        Row: {
+          created_at: string
+          id: string
+          label: string | null
+          stage_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          stage_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          stage_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backlog_stage_links_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "backlog_task_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backlog_task_comments: {
+        Row: {
+          created_at: string
+          id: string
+          task_id: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          task_id: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          task_id?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backlog_task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "backlog_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backlog_task_dependencies: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          release_date: string | null
+          status: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          release_date?: string | null
+          status?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          release_date?: string | null
+          status?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backlog_task_dependencies_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "backlog_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backlog_task_stages: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          sort_order: number
+          stage_name: string
+          start_date: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          sort_order?: number
+          stage_name: string
+          start_date: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          sort_order?: number
+          stage_name?: string
+          start_date?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backlog_task_stages_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "backlog_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backlog_tasks: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          has_dependencies: boolean
+          id: string
+          status: string
+          task_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          has_dependencies?: boolean
+          id?: string
+          status?: string
+          task_type?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          has_dependencies?: boolean
+          id?: string
+          status?: string
+          task_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backlog_tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_logs: {
         Row: {
           call_type: string
