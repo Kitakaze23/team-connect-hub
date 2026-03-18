@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Flag, Loader2 } from "lucide-react";
+import { Plus, Flag, Loader2, Archive } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useBacklogTasks,
