@@ -346,7 +346,7 @@ export default function BacklogView() {
   }
 
   const ROW_HEIGHT = 48;
-  const SEPARATOR_HEIGHT = 3;
+  const SEPARATOR_HEIGHT = 6;
   const HEADER_HEIGHT = 72;
   const TASK_NAME_WIDTH = 240;
   const totalGridHeight = visibleTasks.length > 0

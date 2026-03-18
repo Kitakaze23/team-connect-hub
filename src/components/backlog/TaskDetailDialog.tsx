@@ -152,12 +152,12 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
     }
   };
 
-  const handleChangeResponsible = (stageId: string, userId: string | null) => {
+  const handleChangeResponsible = (stageName: string, userId: string | null) => {
     const newStages = task.stages.map(s => ({
       stage_name: s.stage_name,
       start_date: s.start_date,
       end_date: s.end_date,
-      responsible_user_id: s.id === stageId ? userId : s.responsible_user_id,
+      responsible_user_id: s.stage_name === stageName ? userId : s.responsible_user_id,
     }));
     updateTask.mutate({ id: task.id, stages: newStages });
   };
