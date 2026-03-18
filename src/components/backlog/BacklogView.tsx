@@ -247,7 +247,7 @@ export default function BacklogView() {
     }
 
     return { timelineStart: start, timelineEnd: end, columns: cols, colWidth: cw };
-  }, [period, tasks, milestones, scaleUnit]);
+  }, [period, visibleTasks, milestones, scaleUnit]);
 
   const totalWidth = columns.length * colWidth;
 
