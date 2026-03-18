@@ -326,6 +326,11 @@ export default function BacklogView() {
       {/* Toolbar */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
         <h2 className="font-mono font-bold text-foreground text-lg">Бэклог</h2>
+        {currentSprintNumber && (
+          <span className="text-xs font-mono px-2 py-1 rounded bg-secondary text-secondary-foreground">
+            Спринт #{currentSprintNumber}
+          </span>
+        )}
         <div className="flex-1" />
         <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
           <SelectTrigger className="w-36">
