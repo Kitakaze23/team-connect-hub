@@ -399,7 +399,7 @@ export default function BacklogView() {
             {visibleTasks.map((task, taskIndex) => (
               <div
                 key={task.id}
-                className={`flex items-center px-2 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
+                className={`flex items-center px-2 border-b border-foreground/20 cursor-pointer hover:bg-secondary/50 transition-colors ${
                   task.status === "prom" ? "bg-muted" : ""
                 }`}
                 style={{ height: ROW_HEIGHT }}
