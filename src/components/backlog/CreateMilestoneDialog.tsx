@@ -22,12 +22,12 @@ const MILESTONE_TYPES: Record<string, string> = {
 };
 
 const MILESTONE_COLORS: Record<string, string> = {
-  alpha: "hsl(260, 50%, 55%)",
-  demo: "hsl(210, 70%, 55%)",
-  code_freeze: "hsl(0, 72%, 55%)",
+  alpha: "hsl(270, 60%, 55%)",
+  demo: "hsl(200, 80%, 55%)",
+  code_freeze: "hsl(30, 90%, 55%)",
   feature_freeze: "hsl(30, 90%, 55%)",
-  release_web: "hsl(160, 70%, 40%)",
-  release_mobile: "hsl(174, 60%, 42%)",
+  release_web: "hsl(0, 72%, 50%)",
+  release_mobile: "hsl(0, 72%, 50%)",
 };
 
 export { MILESTONE_TYPES, MILESTONE_COLORS };
