@@ -396,7 +396,7 @@ export default function BacklogView() {
             </div>
           </div>
           <div className="overflow-y-auto" style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
-            {tasks.map((task, taskIndex) => (
+            {visibleTasks.map((task, taskIndex) => (
               <div
                 key={task.id}
                 className={`flex items-center px-2 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
