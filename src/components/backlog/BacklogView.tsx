@@ -468,13 +468,31 @@ export default function BacklogView() {
               {/* Grid lines */}
               {columns.map((d, i) => {
                 const isWeekend = scaleUnit === "day" && (d.getDay() === 0 || d.getDay() === 6);
+                const nextCol = columns[i + 1];
+                // Check if this column's right edge is a month or quarter boundary
+                const isMonthBoundary = nextCol && d.getMonth() !== nextCol.getMonth();
+                const isQuarterBoundary = isMonthBoundary && nextCol && Math.floor(nextCol.getMonth() / 3) !== Math.floor(d.getMonth() / 3);
+
+                let borderClass = "border-border/50";
+                let borderStyle: React.CSSProperties = {};
+                if (isWeekend) {
+                  borderClass = "border-border";
+                }
+                if (isQuarterBoundary) {
+                  borderClass = "border-foreground/30";
+                  borderStyle = { borderRightWidth: 3 };
+                } else if (isMonthBoundary) {
+                  borderClass = "border-foreground/20";
+                  borderStyle = { borderRightWidth: 2 };
+                }
+
                 return (
                   <div
                     key={i}
-                    className={`absolute top-0 bottom-0 border-r ${
-                      isWeekend ? "border-border bg-destructive/5" : "border-border/50"
+                    className={`absolute top-0 bottom-0 border-r ${borderClass} ${
+                      isWeekend ? "bg-destructive/5" : ""
                     }`}
-                    style={{ left: i * colWidth, width: colWidth, height: tasks.length * ROW_HEIGHT || 200 }}
+                    style={{ left: i * colWidth, width: colWidth, height: tasks.length * ROW_HEIGHT || 200, ...borderStyle }}
                   />
                 );
               })}
