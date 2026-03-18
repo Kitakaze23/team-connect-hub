@@ -78,12 +78,12 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_COLORS: Record<string, string> = {
-  business_requirements: "hsl(260, 50%, 55%)",
-  analytics: "hsl(210, 70%, 55%)",
-  design: "hsl(174, 60%, 42%)",
-  development: "hsl(30, 90%, 55%)",
-  testing: "hsl(0, 72%, 55%)",
-  release: "hsl(160, 70%, 40%)",
+  business_requirements: "hsl(45, 90%, 50%)",
+  analytics: "hsl(30, 90%, 55%)",
+  design: "hsl(270, 60%, 55%)",
+  development: "hsl(140, 65%, 40%)",
+  testing: "hsl(200, 80%, 55%)",
+  release: "hsl(0, 72%, 50%)",
 };
 
 export { STAGE_NAMES, STAGE_LABELS, STAGE_COLORS };
