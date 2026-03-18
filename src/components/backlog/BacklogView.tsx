@@ -416,7 +416,7 @@ export default function BacklogView() {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); moveTask(taskIndex, "down"); }}
-                      disabled={taskIndex === tasks.length - 1}
+                      disabled={taskIndex === visibleTasks.length - 1}
                       className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
                     >
                       <ChevronDown className="w-3.5 h-3.5" />
