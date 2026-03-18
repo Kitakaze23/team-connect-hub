@@ -285,7 +285,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                             {format(new Date(stage.start_date), "dd.MM.yyyy")} — {format(new Date(stage.end_date), "dd.MM.yyyy")}
                             {isAdmin && (
                               <button className="text-muted-foreground hover:text-foreground" onClick={() => {
-                                setEditingStageId(stage.id);
+                                setEditingStageName(stageName);
                                 setEditStartDate(stage.start_date);
                                 setEditEndDate(stage.end_date);
                               }}>
