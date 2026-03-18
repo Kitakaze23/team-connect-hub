@@ -80,6 +80,7 @@ const Dashboard = () => {
           >
             {activeTab === "team" && <TeamView />}
             {activeTab === "chat" && <ChatView />}
+            {activeTab === "backlog" && <BacklogView />}
             {activeTab === "profile" && <ProfileView />}
             {activeTab === "settings" && isAdmin && <CompanySettings />}
           </motion.div>
