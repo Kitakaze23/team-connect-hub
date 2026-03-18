@@ -14,7 +14,15 @@ import CompanySettings from "@/components/company/CompanySettings";
 type Tab = "team" | "chat" | "profile" | "settings" | "backlog";
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("chat");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const saved = localStorage.getItem("dashboard-active-tab");
+    return (saved && ["team", "chat", "profile", "settings", "backlog"].includes(saved)) ? saved as Tab : "chat";
+  });
+
+  const handleSetTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    localStorage.setItem("dashboard-active-tab", tab);
+  }, []);
   const isMobile = useIsMobile();
   const { membership } = useAuth();
 
