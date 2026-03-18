@@ -96,7 +96,8 @@ export default function BacklogView() {
   const [period, setPeriod] = useState<Period>("month");
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [createMilestoneOpen, setCreateMilestoneOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<BacklogTask | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId) || null, [tasks, selectedTaskId]);
   const [editingMilestone, setEditingMilestone] = useState<BacklogMilestone | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -297,7 +298,7 @@ export default function BacklogView() {
                   task.status === "prom" ? "opacity-50 bg-muted" : ""
                 }`}
                 style={{ height: ROW_HEIGHT }}
-                onClick={() => setSelectedTask(task)}
+                onClick={() => setSelectedTaskId(task.id)}
               >
                 <div className="min-w-0 flex items-center gap-1.5">
                   {task.status === "backlog" && <Archive className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
@@ -422,7 +423,7 @@ export default function BacklogView() {
                           backgroundColor: isProm ? "hsl(var(--muted))" : color,
                           opacity: isProm ? 0.5 : 0.85,
                         }}
-                        onClick={() => setSelectedTask(task)}
+                        onClick={() => setSelectedTaskId(task.id)}
                         title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
                       >
                         {w > 60 && (
@@ -454,7 +455,7 @@ export default function BacklogView() {
       <CreateTaskDialog open={createTaskOpen} onOpenChange={setCreateTaskOpen} />
       <CreateMilestoneDialog open={createMilestoneOpen} onOpenChange={setCreateMilestoneOpen} />
       <EditMilestoneDialog milestone={editingMilestone} open={!!editingMilestone} onOpenChange={(v) => !v && setEditingMilestone(null)} />
-      <TaskDetailDialog task={selectedTask} open={!!selectedTask} onOpenChange={(v) => !v && setSelectedTask(null)} />
+      <TaskDetailDialog task={selectedTask} open={!!selectedTask} onOpenChange={(v) => !v && setSelectedTaskId(null)} />
     </div>
   );
 }
