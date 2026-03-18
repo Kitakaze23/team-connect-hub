@@ -270,7 +270,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => {
                               if (editStartDate && editEndDate) {
                                 const newStages = task.stages.map(s =>
-                                  s.id === stage.id
+                                  s.stage_name === stage.stage_name
                                     ? { stage_name: s.stage_name, start_date: editStartDate, end_date: editEndDate, responsible_user_id: s.responsible_user_id }
                                     : { stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, responsible_user_id: s.responsible_user_id }
                                 );
