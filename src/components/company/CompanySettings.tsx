@@ -42,7 +42,7 @@ const CompanySettings = () => {
     // Fetch company
     const { data: company } = await supabase
       .from("companies")
-      .select("name, invite_code")
+      .select("name, invite_code, sprint_length_days, sprint_start_date")
       .eq("id", companyId)
       .single();
 
