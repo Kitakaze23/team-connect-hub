@@ -397,13 +397,16 @@ export default function BacklogView() {
           </div>
           <div className="overflow-y-auto" style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
             {visibleTasks.map((task, taskIndex) => (
-              <div
-                key={task.id}
-                className={`flex items-center px-2 cursor-pointer hover:bg-secondary/50 transition-colors ${
-                  task.status === "prom" ? "bg-muted" : ""
-                }`}
-                style={{ height: ROW_HEIGHT }}
-              >
+              <React.Fragment key={task.id}>
+                {taskIndex > 0 && (
+                  <div className="h-[3px] bg-foreground/15 shrink-0" />
+                )}
+                <div
+                  className={`flex items-center px-2 cursor-pointer hover:bg-secondary/50 transition-colors ${
+                    task.status === "prom" ? "bg-muted" : ""
+                  }`}
+                  style={{ height: ROW_HEIGHT }}
+                >
                 {/* Move buttons */}
                 {isAdmin && (
                   <div className="flex flex-col shrink-0 mr-1">
