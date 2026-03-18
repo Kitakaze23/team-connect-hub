@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2, Timer } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import TeamManagement from "./TeamManagement";
 import DeskManagement from "./DeskManagement";
 import { Button } from "@/components/ui/button";
@@ -258,14 +259,29 @@ const CompanySettings = () => {
                   >
                     {m.role === "admin" ? <ShieldOff className="w-4 h-4 text-muted-foreground" /> : <Shield className="w-4 h-4 text-accent" />}
                   </Button>
-                  <Button
-                    size="sm" variant="ghost"
-                    onClick={() => handleRemoveMember(m.id, m.user_id)}
-                    className="h-8 px-2 text-destructive"
-                    title="Удалить из компании"
-                  >
-                    <UserMinus className="w-4 h-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm" variant="ghost"
+                        className="h-8 px-2 text-destructive"
+                        title="Удалить из компании"
+                      >
+                        <UserMinus className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Удалить сотрудника?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {m.profile?.first_name} {m.profile?.last_name} будет удалён из компании.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleRemoveMember(m.id, m.user_id)}>Удалить</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               )}
             </div>
