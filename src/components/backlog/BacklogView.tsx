@@ -298,7 +298,7 @@ export default function BacklogView() {
                   task.status === "prom" ? "opacity-50 bg-muted" : ""
                 }`}
                 style={{ height: ROW_HEIGHT }}
-                onClick={() => setSelectedTask(task)}
+                onClick={() => setSelectedTaskId(task.id)}
               >
                 <div className="min-w-0 flex items-center gap-1.5">
                   {task.status === "backlog" && <Archive className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
