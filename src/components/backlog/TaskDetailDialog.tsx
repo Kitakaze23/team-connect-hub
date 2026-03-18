@@ -86,7 +86,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const [newLinkStageId, setNewLinkStageId] = useState<string | null>(null);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
-  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editingStageName, setEditingStageName] = useState<string | null>(null);
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
   const [editingDepId, setEditingDepId] = useState<string | null>(null);
@@ -152,12 +152,12 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
     }
   };
 
-  const handleChangeResponsible = (stageId: string, userId: string | null) => {
+  const handleChangeResponsible = (stageName: string, userId: string | null) => {
     const newStages = task.stages.map(s => ({
       stage_name: s.stage_name,
       start_date: s.start_date,
       end_date: s.end_date,
-      responsible_user_id: s.id === stageId ? userId : s.responsible_user_id,
+      responsible_user_id: s.stage_name === stageName ? userId : s.responsible_user_id,
     }));
     updateTask.mutate({ id: task.id, stages: newStages });
   };
@@ -244,7 +244,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
               const stage = task.stages.find(s => s.stage_name === stageName);
               const isActive = !!stage;
               const links = stage ? allLinks.filter((l) => l.stage_id === stage.id) : [];
-              const isEditingDates = stage && editingStageId === stage.id;
+              const isEditingDates = isActive && editingStageName === stageName;
               const responsibleName = stage ? getMemberName(stage.responsible_user_id) : null;
 
               return (
@@ -270,22 +270,22 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => {
                               if (editStartDate && editEndDate) {
                                 const newStages = task.stages.map(s =>
-                                  s.id === stage.id
+                                  s.stage_name === stage.stage_name
                                     ? { stage_name: s.stage_name, start_date: editStartDate, end_date: editEndDate, responsible_user_id: s.responsible_user_id }
                                     : { stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, responsible_user_id: s.responsible_user_id }
                                 );
                                 updateTask.mutate({ id: task.id, stages: newStages });
                               }
-                              setEditingStageId(null);
+                              setEditingStageName(null);
                             }}>✓</Button>
-                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageId(null)}><X className="w-3 h-3" /></Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageName(null)}><X className="w-3 h-3" /></Button>
                           </div>
                         ) : (
                           <>
                             {format(new Date(stage.start_date), "dd.MM.yyyy")} — {format(new Date(stage.end_date), "dd.MM.yyyy")}
                             {isAdmin && (
                               <button className="text-muted-foreground hover:text-foreground" onClick={() => {
-                                setEditingStageId(stage.id);
+                                setEditingStageName(stageName);
                                 setEditStartDate(stage.start_date);
                                 setEditEndDate(stage.end_date);
                               }}>
@@ -305,7 +305,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                       {isAdmin ? (
                         <Select
                           value={stage.responsible_user_id || "__none__"}
-                          onValueChange={(v) => handleChangeResponsible(stage.id, v === "__none__" ? null : v)}
+                          onValueChange={(v) => handleChangeResponsible(stageName, v === "__none__" ? null : v)}
                         >
                           <SelectTrigger className="h-7 text-xs w-48"><SelectValue placeholder="Не назначен" /></SelectTrigger>
                           <SelectContent>
