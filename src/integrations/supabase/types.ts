@@ -323,6 +323,8 @@ export type Database = {
           invite_code: string | null
           name: string
           owner_id: string
+          sprint_length_days: number
+          sprint_start_date: string | null
           status: string
           updated_at: string
         }
@@ -334,6 +336,8 @@ export type Database = {
           invite_code?: string | null
           name: string
           owner_id: string
+          sprint_length_days?: number
+          sprint_start_date?: string | null
           status?: string
           updated_at?: string
         }
@@ -345,6 +349,8 @@ export type Database = {
           invite_code?: string | null
           name?: string
           owner_id?: string
+          sprint_length_days?: number
+          sprint_start_date?: string | null
           status?: string
           updated_at?: string
         }

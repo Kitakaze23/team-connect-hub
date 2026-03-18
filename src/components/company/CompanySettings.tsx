@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2 } from "lucide-react";
+import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2, Timer } from "lucide-react";
 import TeamManagement from "./TeamManagement";
 import DeskManagement from "./DeskManagement";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ const CompanySettings = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingMembers, setPendingMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sprintLengthDays, setSprintLengthDays] = useState(14);
+  const [sprintStartDate, setSprintStartDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   const companyId = membership?.company_id;
@@ -40,13 +42,15 @@ const CompanySettings = () => {
     // Fetch company
     const { data: company } = await supabase
       .from("companies")
-      .select("name, invite_code")
+      .select("name, invite_code, sprint_length_days, sprint_start_date")
       .eq("id", companyId)
       .single();
 
     if (company) {
       setCompanyName(company.name);
       setInviteCode(company.invite_code || "");
+      setSprintLengthDays(company.sprint_length_days || 14);
+      setSprintStartDate(company.sprint_start_date || "");
     }
 
     // Fetch members
@@ -95,6 +99,17 @@ const CompanySettings = () => {
     const { error } = await supabase.from("companies").update({ name: companyName.trim() }).eq("id", companyId);
     if (error) toast({ title: "Ошибка", description: error.message, variant: "destructive" });
     else toast({ title: "Сохранено" });
+    setSaving(false);
+  };
+
+  const handleSaveSprint = async () => {
+    if (!companyId) return;
+    setSaving(true);
+    const updates: any = { sprint_length_days: sprintLengthDays };
+    if (sprintStartDate) updates.sprint_start_date = sprintStartDate;
+    const { error } = await supabase.from("companies").update(updates).eq("id", companyId);
+    if (error) toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    else toast({ title: "Настройки спринта сохранены" });
     setSaving(false);
   };
 
@@ -255,6 +270,35 @@ const CompanySettings = () => {
               )}
             </div>
           ))}
+        </motion.div>
+
+        {/* Sprint settings */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
+            <Timer className="w-4 h-4" /> Настройки спринта
+          </h3>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Размер спринта (дни)</Label>
+            <Input
+              type="number"
+              min={1}
+              value={sprintLengthDays}
+              onChange={(e) => setSprintLengthDays(Number(e.target.value) || 14)}
+              className="h-9 bg-secondary/50 w-32"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Дата начала первого спринта</Label>
+            <Input
+              type="date"
+              value={sprintStartDate}
+              onChange={(e) => setSprintStartDate(e.target.value)}
+              className="h-9 bg-secondary/50 w-48"
+            />
+          </div>
+          <Button size="sm" onClick={handleSaveSprint} disabled={saving} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Сохранить"}
+          </Button>
         </motion.div>
 
         {/* Team management */}

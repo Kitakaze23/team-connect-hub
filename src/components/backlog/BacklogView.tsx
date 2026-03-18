@@ -19,6 +19,8 @@ import EditMilestoneDialog from "@/components/backlog/EditMilestoneDialog";
 import TaskDetailDialog from "@/components/backlog/TaskDetailDialog";
 import { addDays, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, format, parseISO, isWithinInterval } from "date-fns";
 import { ru } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 function BacklogStats({ tasks }: { tasks: BacklogTask[] }) {
   const now = new Date();
@@ -134,8 +136,32 @@ function getScaleUnit(period: Period): ScaleUnit {
 export default function BacklogView() {
   const { membership } = useAuth();
   const isAdmin = membership?.role === "admin";
+  const companyId = membership?.company_id;
   const { data: tasks = [], isLoading: tasksLoading } = useBacklogTasks();
   const { data: milestones = [], isLoading: milestonesLoading } = useBacklogMilestones();
+
+  const { data: sprintSettings } = useQuery({
+    queryKey: ["sprint-settings", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("sprint_length_days, sprint_start_date")
+        .eq("id", companyId!)
+        .single();
+      if (error) throw error;
+      return data as { sprint_length_days: number; sprint_start_date: string | null };
+    },
+  });
+
+  const currentSprintNumber = useMemo(() => {
+    if (!sprintSettings?.sprint_start_date || !sprintSettings?.sprint_length_days) return null;
+    const start = parseISO(sprintSettings.sprint_start_date);
+    const now = new Date();
+    const daysDiff = differenceInDays(now, start);
+    if (daysDiff < 0) return null;
+    return Math.floor(daysDiff / sprintSettings.sprint_length_days) + 1;
+  }, [sprintSettings]);
 
   const [period, setPeriod] = useState<Period>("month");
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -300,6 +326,11 @@ export default function BacklogView() {
       {/* Toolbar */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
         <h2 className="font-mono font-bold text-foreground text-lg">Бэклог</h2>
+        {currentSprintNumber && (
+          <span className="text-xs font-mono px-2 py-1 rounded bg-secondary text-secondary-foreground">
+            Спринт #{currentSprintNumber}
+          </span>
+        )}
         <div className="flex-1" />
         <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
           <SelectTrigger className="w-36">
@@ -339,7 +370,7 @@ export default function BacklogView() {
               <div
                 key={task.id}
                 className={`flex items-center px-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
-                  task.status === "prom" ? "opacity-50 bg-muted" : ""
+                  task.status === "prom" ? "bg-muted" : ""
                 }`}
                 style={{ height: ROW_HEIGHT }}
                 onClick={() => setSelectedTaskId(task.id)}
@@ -425,7 +456,8 @@ export default function BacklogView() {
                 const x = getX(m.date);
                 if (x < 0 || x > totalWidth) return null;
                 const color = MILESTONE_COLORS[m.milestone_type] || "hsl(var(--accent))";
-                const label = MILESTONE_TYPES[m.milestone_type] || m.name;
+                const defaultLabel = MILESTONE_TYPES[m.milestone_type] || "";
+                const label = m.name && m.name !== defaultLabel ? m.name : defaultLabel;
                 return (
                   <div
                     key={m.id}
@@ -459,19 +491,19 @@ export default function BacklogView() {
                     return (
                       <div
                         key={stage.id}
-                        className={`absolute top-2 rounded cursor-pointer hover:opacity-80 transition-opacity group ${isProm ? "grayscale" : ""}`}
+                        className={`absolute top-2 rounded cursor-pointer hover:opacity-80 transition-opacity group`}
                         style={{
                           left: x,
                           width: w,
                           height: ROW_HEIGHT - 16,
-                          backgroundColor: isProm ? "hsl(var(--muted))" : color,
-                          opacity: isProm ? 0.5 : 0.85,
+                          backgroundColor: color,
+                          opacity: isProm ? 0.35 : 0.85,
                         }}
                         onClick={() => setSelectedTaskId(task.id)}
                         title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
                       >
                         {w > 60 && (
-                          <span className={`text-[9px] font-medium px-1.5 truncate block leading-[32px] ${isProm ? "text-muted-foreground" : "text-white"}`}>
+                          <span className={`text-[9px] font-medium px-1.5 truncate block leading-[32px] text-white`}>
                             {STAGE_LABELS[stage.stage_name]}
                           </span>
                         )}

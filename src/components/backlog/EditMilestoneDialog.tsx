@@ -19,19 +19,24 @@ export default function EditMilestoneDialog({ milestone, open, onOpenChange }: P
   const remove = useDeleteMilestone();
   const [date, setDate] = useState("");
   const [type, setType] = useState("");
+  const [customName, setCustomName] = useState("");
 
   useEffect(() => {
     if (milestone) {
       setDate(milestone.date);
       setType(milestone.milestone_type);
+      // If name differs from default type label, it's a custom name
+      const defaultName = MILESTONE_TYPES[milestone.milestone_type] || "";
+      setCustomName(milestone.name !== defaultName ? milestone.name : "");
     }
   }, [milestone]);
 
   if (!milestone) return null;
 
   const handleSave = () => {
+    const name = customName.trim() || MILESTONE_TYPES[type] || type;
     update.mutate(
-      { id: milestone.id, date, milestone_type: type, name: MILESTONE_TYPES[type] || type },
+      { id: milestone.id, date, milestone_type: type, name },
       { onSuccess: () => onOpenChange(false) }
     );
   };
@@ -57,6 +62,14 @@ export default function EditMilestoneDialog({ milestone, open, onOpenChange }: P
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>Название (необязательно)</Label>
+            <Input
+              placeholder={MILESTONE_TYPES[type] || ""}
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+            />
           </div>
           <div>
             <Label>Дата</Label>

@@ -36,13 +36,16 @@ export default function CreateMilestoneDialog({ open, onOpenChange }: Props) {
   const create = useCreateMilestone();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [type, setType] = useState("release_web");
+  const [customName, setCustomName] = useState("");
 
   const handleSubmit = () => {
-    create.mutate({ name: MILESTONE_TYPES[type] || type, date, milestone_type: type }, {
+    const name = customName.trim() || MILESTONE_TYPES[type] || type;
+    create.mutate({ name, date, milestone_type: type }, {
       onSuccess: () => {
         onOpenChange(false);
         setDate(format(new Date(), "yyyy-MM-dd"));
         setType("release_web");
+        setCustomName("");
       },
     });
   };
@@ -64,6 +67,14 @@ export default function CreateMilestoneDialog({ open, onOpenChange }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>Название (необязательно)</Label>
+            <Input
+              placeholder={MILESTONE_TYPES[type] || ""}
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+            />
           </div>
           <div>
             <Label>Дата</Label>
