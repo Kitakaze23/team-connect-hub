@@ -305,7 +305,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                       {isAdmin ? (
                         <Select
                           value={stage.responsible_user_id || "__none__"}
-                          onValueChange={(v) => handleChangeResponsible(stage.id, v === "__none__" ? null : v)}
+                          onValueChange={(v) => handleChangeResponsible(stageName, v === "__none__" ? null : v)}
                         >
                           <SelectTrigger className="h-7 text-xs w-48"><SelectValue placeholder="Не назначен" /></SelectTrigger>
                           <SelectContent>
