@@ -553,7 +553,7 @@ export default function BacklogView() {
               {/* Today line */}
               {(() => {
                 const todayX = getX(format(new Date(), "yyyy-MM-dd"));
-                const gridHeight = visibleTasks.length * ROW_HEIGHT || 200;
+                if (todayX >= 0 && todayX <= totalWidth) {
                 if (todayX >= 0 && todayX <= totalWidth) {
                   return (
                     <div
