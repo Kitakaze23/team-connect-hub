@@ -101,7 +101,7 @@ const Dashboard = () => {
           {tabConfig.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleSetTab(tab.id)}
               className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-xl transition-all ${
                 activeTab === tab.id
                   ? "text-accent"
