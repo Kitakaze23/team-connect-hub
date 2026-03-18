@@ -226,6 +226,7 @@ export type Database = {
           created_by: string
           has_dependencies: boolean
           id: string
+          sort_order: number
           status: string
           task_type: string
           title: string
@@ -237,6 +238,7 @@ export type Database = {
           created_by: string
           has_dependencies?: boolean
           id?: string
+          sort_order?: number
           status?: string
           task_type?: string
           title: string
@@ -248,6 +250,7 @@ export type Database = {
           created_by?: string
           has_dependencies?: boolean
           id?: string
+          sort_order?: number
           status?: string
           task_type?: string
           title?: string

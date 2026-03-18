@@ -1,0 +1,1 @@
+ALTER TABLE public.backlog_tasks ADD COLUMN sort_order integer NOT NULL DEFAULT 0;

@@ -99,6 +99,7 @@ export function useBacklogTasks() {
         .from("backlog_tasks")
         .select("*")
         .eq("company_id", companyId!)
+        .order("sort_order")
         .order("created_at");
 
       if (error) throw error;
@@ -255,6 +256,22 @@ export function useUpdateTask() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["backlog-tasks"] });
       toast({ title: "Задача обновлена" });
+    },
+    onError: (e) => toast({ title: "Ошибка", description: e.message, variant: "destructive" }),
+  });
+}
+
+export function useReorderTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const updates = orderedIds.map((id, i) =>
+        supabase.from("backlog_tasks").update({ sort_order: i }).eq("id", id)
+      );
+      await Promise.all(updates);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["backlog-tasks"] });
     },
     onError: (e) => toast({ title: "Ошибка", description: e.message, variant: "destructive" }),
   });
