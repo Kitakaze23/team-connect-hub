@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, MessageSquare, UserCircle, Terminal, Settings, LayoutList } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -14,7 +14,15 @@ import CompanySettings from "@/components/company/CompanySettings";
 type Tab = "team" | "chat" | "profile" | "settings" | "backlog";
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("chat");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const saved = localStorage.getItem("dashboard-active-tab");
+    return (saved && ["team", "chat", "profile", "settings", "backlog"].includes(saved)) ? saved as Tab : "chat";
+  });
+
+  const handleSetTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    localStorage.setItem("dashboard-active-tab", tab);
+  }, []);
   const isMobile = useIsMobile();
   const { membership } = useAuth();
 
@@ -47,7 +55,7 @@ const Dashboard = () => {
             {tabConfig.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleSetTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeTab === tab.id
                     ? "bg-card text-foreground shadow-sm"
@@ -93,7 +101,7 @@ const Dashboard = () => {
           {tabConfig.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleSetTab(tab.id)}
               className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-xl transition-all ${
                 activeTab === tab.id
                   ? "text-accent"
