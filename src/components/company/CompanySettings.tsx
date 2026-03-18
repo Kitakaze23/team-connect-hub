@@ -273,7 +273,7 @@ const CompanySettings = () => {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Удалить сотрудника?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          {m.first_name} {m.last_name} будет удалён из компании.
+                          {m.profile?.first_name} {m.profile?.last_name} будет удалён из компании.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
