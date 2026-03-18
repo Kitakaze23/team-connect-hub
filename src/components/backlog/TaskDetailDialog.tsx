@@ -278,7 +278,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                               }
                               setEditingStageName(null);
                             }}>✓</Button>
-                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageId(null)}><X className="w-3 h-3" /></Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageName(null)}><X className="w-3 h-3" /></Button>
                           </div>
                         ) : (
                           <>
