@@ -338,8 +338,12 @@ export default function BacklogView() {
   }
 
   const ROW_HEIGHT = 48;
+  const SEPARATOR_HEIGHT = 3;
   const HEADER_HEIGHT = 72;
   const TASK_NAME_WIDTH = 240;
+  const totalGridHeight = visibleTasks.length > 0
+    ? visibleTasks.length * ROW_HEIGHT + (visibleTasks.length - 1) * SEPARATOR_HEIGHT
+    : 200;
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -516,7 +520,7 @@ export default function BacklogView() {
                     className={`absolute top-0 bottom-0 border-r ${borderClass} ${
                       isWeekend ? "bg-destructive/5" : ""
                     }`}
-                    style={{ left: i * colWidth, width: colWidth, height: visibleTasks.length * ROW_HEIGHT || 200, ...borderStyle }}
+                    style={{ left: i * colWidth, width: colWidth, height: totalGridHeight, ...borderStyle }}
                   />
                 );
               })}
@@ -532,7 +536,7 @@ export default function BacklogView() {
                   <div
                     key={m.id}
                     className={`absolute top-0 z-20 ${isAdmin ? "cursor-pointer" : "pointer-events-none"}`}
-                    style={{ left: x + colWidth / 2, height: visibleTasks.length * ROW_HEIGHT || 200 }}
+                    style={{ left: x + colWidth / 2, height: totalGridHeight }}
                     onClick={() => isAdmin && setEditingMilestone(m)}
                   >
                     <div className="w-px h-full" style={{ backgroundColor: color, opacity: 0.6 }} />
@@ -549,12 +553,11 @@ export default function BacklogView() {
               {/* Today line */}
               {(() => {
                 const todayX = getX(format(new Date(), "yyyy-MM-dd"));
-                const gridHeight = visibleTasks.length * ROW_HEIGHT || 200;
                 if (todayX >= 0 && todayX <= totalWidth) {
                   return (
                     <div
                       className="absolute top-0 z-30 pointer-events-none"
-                      style={{ left: todayX + colWidth / 2, height: gridHeight }}
+                      style={{ left: todayX + colWidth / 2, height: totalGridHeight }}
                     >
                       <div className="w-0.5 h-full" style={{ backgroundColor: "hsl(345, 80%, 25%)" }} />
                       <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap text-white" style={{ backgroundColor: "hsl(345, 80%, 25%)" }}>
@@ -566,14 +569,13 @@ export default function BacklogView() {
                 return null;
               })()}
 
-              {/* Task bars */}
-              {visibleTasks.map((task) => {
+              {/* Task bars with separators */}
+              {visibleTasks.map((task, taskIndex) => {
                 // Detect overlapping stages and assign rows
                 const stageRows = task.stages.map((stage, idx) => {
                   let row = 0;
                   for (let j = 0; j < idx; j++) {
                     const prev = task.stages[j];
-                    // Check overlap: stages overlap if one starts before the other ends
                     if (prev.start_date < stage.end_date && stage.start_date < prev.end_date) {
                       row++;
                     }
@@ -585,45 +587,49 @@ export default function BacklogView() {
                 const barHeight = hasOverlap ? Math.floor((ROW_HEIGHT - 16) / (maxRow + 1)) - 1 : ROW_HEIGHT - 16;
 
                 return (
-                  <div
-                    key={task.id}
-                    className="relative border-b border-border"
-                    style={{ height: ROW_HEIGHT }}
-                  >
-                    {task.stages.map((stage, idx) => {
-                      const x = getX(stage.start_date);
-                      const w = getWidth(stage.start_date, stage.end_date);
-                      const color = STAGE_COLORS[stage.stage_name] || "hsl(var(--accent))";
-                      const isProm = task.status === "prom";
-                      const row = stageRows[idx];
-                      const topOffset = 8 + row * (barHeight + 1);
-                      return (
-                        <div
-                          key={stage.id}
-                          className="absolute rounded cursor-pointer hover:opacity-80 transition-opacity group"
-                          style={{
-                            left: x,
-                            width: w,
-                            top: topOffset,
-                            height: barHeight,
-                            backgroundColor: color,
-                            opacity: isProm ? 0.35 : 0.85,
-                          }}
-                          onClick={() => setSelectedTaskId(task.id)}
-                          title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
-                        >
-                          {w > 60 && barHeight >= 16 && (
-                            <span
-                              className="text-[9px] font-medium px-1.5 truncate block text-white"
-                              style={{ lineHeight: `${barHeight}px` }}
-                            >
-                              {STAGE_LABELS[stage.stage_name]}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <React.Fragment key={task.id}>
+                    {taskIndex > 0 && (
+                      <div className="bg-foreground/15" style={{ height: SEPARATOR_HEIGHT }} />
+                    )}
+                    <div
+                      className="relative"
+                      style={{ height: ROW_HEIGHT }}
+                    >
+                      {task.stages.map((stage, idx) => {
+                        const x = getX(stage.start_date);
+                        const w = getWidth(stage.start_date, stage.end_date);
+                        const color = STAGE_COLORS[stage.stage_name] || "hsl(var(--accent))";
+                        const isProm = task.status === "prom";
+                        const row = stageRows[idx];
+                        const topOffset = 8 + row * (barHeight + 1);
+                        return (
+                          <div
+                            key={stage.id}
+                            className="absolute rounded cursor-pointer hover:opacity-80 transition-opacity group"
+                            style={{
+                              left: x,
+                              width: w,
+                              top: topOffset,
+                              height: barHeight,
+                              backgroundColor: color,
+                              opacity: isProm ? 0.35 : 0.85,
+                            }}
+                            onClick={() => setSelectedTaskId(task.id)}
+                            title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
+                          >
+                            {w > 60 && barHeight >= 16 && (
+                              <span
+                                className="text-[9px] font-medium px-1.5 truncate block text-white"
+                                style={{ lineHeight: `${barHeight}px` }}
+                              >
+                                {STAGE_LABELS[stage.stage_name]}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </React.Fragment>
                 );
               })}
             </div>
