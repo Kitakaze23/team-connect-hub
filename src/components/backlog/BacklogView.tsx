@@ -117,6 +117,7 @@ const STATUS_LABELS: Record<string, string> = {
   development: "Разработка",
   prom: "ПРОМ",
   cancelled: "Отменена",
+  archived: "Архив",
 };
 
 const TASK_TYPE_LABELS: Record<string, string> = {
