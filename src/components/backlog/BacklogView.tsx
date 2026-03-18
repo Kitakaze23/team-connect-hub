@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Flag, Loader2 } from "lucide-react";
+import { Plus, Flag, Loader2, Archive } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useBacklogTasks,
@@ -20,6 +20,7 @@ import { ru } from "date-fns/locale";
 type Period = "week" | "month" | "quarter" | "custom";
 
 const STATUS_LABELS: Record<string, string> = {
+  backlog: "Бэклог",
   development: "Разработка",
   prom: "ПРОМ",
   cancelled: "Отменена",
@@ -170,19 +171,24 @@ export default function BacklogView() {
             {tasks.map((task) => (
               <div
                 key={task.id}
-                className="flex items-center px-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors"
+                className={`flex items-center px-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
+                  task.status === "prom" ? "opacity-50 bg-muted" : ""
+                }`}
                 style={{ height: ROW_HEIGHT }}
                 onClick={() => setSelectedTask(task)}
               >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate text-foreground">{task.title}</div>
-                  <div className="flex gap-1 items-center">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
-                      {TASK_TYPE_LABELS[task.task_type] || task.task_type}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {STATUS_LABELS[task.status] || task.status}
-                    </span>
+                <div className="min-w-0 flex items-center gap-1.5">
+                  {task.status === "backlog" && <Archive className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                  <div>
+                    <div className="text-sm font-medium truncate text-foreground">{task.title}</div>
+                    <div className="flex gap-1 items-center">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
+                        {TASK_TYPE_LABELS[task.task_type] || task.task_type}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {STATUS_LABELS[task.status] || task.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -276,26 +282,27 @@ export default function BacklogView() {
                   className="relative border-b border-border"
                   style={{ height: ROW_HEIGHT }}
                 >
-                  {task.stages.map((stage) => {
+              {task.stages.map((stage) => {
                     const x = getX(stage.start_date);
                     const w = getWidth(stage.start_date, stage.end_date);
                     const color = STAGE_COLORS[stage.stage_name] || "hsl(var(--accent))";
+                    const isProm = task.status === "prom";
                     return (
                       <div
                         key={stage.id}
-                        className="absolute top-2 rounded cursor-pointer hover:opacity-80 transition-opacity group"
+                        className={`absolute top-2 rounded cursor-pointer hover:opacity-80 transition-opacity group ${isProm ? "grayscale" : ""}`}
                         style={{
                           left: x,
                           width: w,
                           height: ROW_HEIGHT - 16,
-                          backgroundColor: color,
-                          opacity: 0.85,
+                          backgroundColor: isProm ? "hsl(var(--muted))" : color,
+                          opacity: isProm ? 0.5 : 0.85,
                         }}
                         onClick={() => setSelectedTask(task)}
                         title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
                       >
                         {w > 60 && (
-                          <span className="text-[9px] text-white font-medium px-1.5 truncate block leading-[32px]">
+                          <span className={`text-[9px] font-medium px-1.5 truncate block leading-[32px] ${isProm ? "text-muted-foreground" : "text-white"}`}>
                             {STAGE_LABELS[stage.stage_name]}
                           </span>
                         )}

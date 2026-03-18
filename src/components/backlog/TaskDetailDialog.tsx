@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Plus, Send, Trash2, X } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import {
   BacklogTask,
   STAGE_LABELS,
@@ -30,6 +30,7 @@ interface Props {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  backlog: "Бэклог",
   development: "Разработка",
   prom: "ПРОМ",
   cancelled: "Отменена",
@@ -51,6 +52,9 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const [newLinkStageId, setNewLinkStageId] = useState<string | null>(null);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
 
   if (!task) return null;
 
@@ -111,15 +115,47 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
         <div>
           <Label className="font-semibold text-base">Этапы</Label>
           <div className="space-y-2 mt-2">
-            {task.stages.map((stage) => {
+           {task.stages.map((stage) => {
               const links = allLinks.filter((l) => l.stage_id === stage.id);
+              const isEditingDates = editingStageId === stage.id;
               return (
                 <div key={stage.id} className="border border-border rounded-lg p-3">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STAGE_COLORS[stage.stage_name] }} />
                     <span className="font-medium text-sm">{STAGE_LABELS[stage.stage_name]}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      {format(new Date(stage.start_date), "dd.MM.yyyy")} — {format(new Date(stage.end_date), "dd.MM.yyyy")}
+                    <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+                      {isEditingDates ? (
+                        <div className="flex gap-1 items-center">
+                          <Input type="date" className="h-7 text-xs w-32" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
+                          <span>—</span>
+                          <Input type="date" className="h-7 text-xs w-32" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} />
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => {
+                            if (editStartDate && editEndDate) {
+                              const newStages = task.stages.map(s =>
+                                s.id === stage.id
+                                  ? { stage_name: s.stage_name, start_date: editStartDate, end_date: editEndDate }
+                                  : { stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date }
+                              );
+                              updateTask.mutate({ id: task.id, stages: newStages });
+                            }
+                            setEditingStageId(null);
+                          }}>✓</Button>
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageId(null)}><X className="w-3 h-3" /></Button>
+                        </div>
+                      ) : (
+                        <>
+                          {format(new Date(stage.start_date), "dd.MM.yyyy")} — {format(new Date(stage.end_date), "dd.MM.yyyy")}
+                          {isAdmin && (
+                            <button className="text-muted-foreground hover:text-foreground" onClick={() => {
+                              setEditingStageId(stage.id);
+                              setEditStartDate(stage.start_date);
+                              setEditEndDate(stage.end_date);
+                            }}>
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                        </>
+                      )}
                     </span>
                   </div>
                   {/* Links */}

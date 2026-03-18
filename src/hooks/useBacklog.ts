@@ -60,8 +60,8 @@ export interface StageLink {
 
 const STAGE_NAMES = [
   "business_requirements",
-  "analytics",
   "design",
+  "analytics",
   "development",
   "testing",
   "release",
