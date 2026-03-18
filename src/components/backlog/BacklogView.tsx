@@ -12,14 +12,54 @@ import {
   STAGE_LABELS,
   STAGE_COLORS,
 } from "@/hooks/useBacklog";
-import { startOfYear, endOfYear, startOfQuarter, endOfQuarter, isWithinInterval } from "date-fns";
 import { MILESTONE_COLORS, MILESTONE_TYPES } from "@/components/backlog/CreateMilestoneDialog";
 import CreateTaskDialog from "@/components/backlog/CreateTaskDialog";
 import CreateMilestoneDialog from "@/components/backlog/CreateMilestoneDialog";
 import EditMilestoneDialog from "@/components/backlog/EditMilestoneDialog";
 import TaskDetailDialog from "@/components/backlog/TaskDetailDialog";
-import { addDays, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, format, parseISO } from "date-fns";
+import { addDays, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, format, parseISO, isWithinInterval } from "date-fns";
 import { ru } from "date-fns/locale";
+
+function BacklogStats({ tasks }: { tasks: BacklogTask[] }) {
+  const now = new Date();
+  const yearInterval = { start: startOfYear(now), end: endOfYear(now) };
+  const quarterInterval = { start: startOfQuarter(now), end: endOfQuarter(now) };
+
+  const tasksInYear = tasks.filter(t => t.stages.some(s => isWithinInterval(parseISO(s.start_date), yearInterval) || isWithinInterval(parseISO(s.end_date), yearInterval))).length;
+  const tasksInQuarter = tasks.filter(t => t.stages.some(s => isWithinInterval(parseISO(s.start_date), quarterInterval) || isWithinInterval(parseISO(s.end_date), quarterInterval))).length;
+  const tasksInWork = tasks.filter(t => t.status === "development").length;
+  const tasksDone = tasks.filter(t => t.status === "prom").length;
+  const tasksBacklog = tasks.filter(t => t.status === "backlog").length;
+
+  const stats = [
+    { label: "В году", value: tasksInYear },
+    { label: "В квартале", value: tasksInQuarter },
+    { label: "В работе", value: tasksInWork },
+    { label: "Завершено", value: tasksDone },
+    { label: "Бэклог", value: tasksBacklog },
+  ];
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline">
+          <BarChart3 className="w-4 h-4 mr-1" /> Статистика
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-3">
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Статистика задач</p>
+          {stats.map(s => (
+            <div key={s.label} className="flex justify-between text-sm">
+              <span className="text-muted-foreground">{s.label}</span>
+              <span className="font-medium">{s.value}</span>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type Period = "week" | "month" | "quarter" | "year";
 
