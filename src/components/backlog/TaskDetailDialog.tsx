@@ -276,7 +276,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                                 );
                                 updateTask.mutate({ id: task.id, stages: newStages });
                               }
-                              setEditingStageId(null);
+                              setEditingStageName(null);
                             }}>✓</Button>
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageId(null)}><X className="w-3 h-3" /></Button>
                           </div>
