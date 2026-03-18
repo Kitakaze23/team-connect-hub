@@ -542,6 +542,26 @@ export default function BacklogView() {
                 );
               })}
 
+              {/* Today line */}
+              {(() => {
+                const todayX = getX(format(new Date(), "yyyy-MM-dd"));
+                const gridHeight = visibleTasks.length * ROW_HEIGHT || 200;
+                if (todayX >= 0 && todayX <= totalWidth) {
+                  return (
+                    <div
+                      className="absolute top-0 z-30 pointer-events-none"
+                      style={{ left: todayX + colWidth / 2, height: gridHeight }}
+                    >
+                      <div className="w-0.5 h-full bg-red-900/80" />
+                      <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap bg-red-900 text-white">
+                        Сегодня
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Task bars */}
               {visibleTasks.map((task) => {
                 // Detect overlapping stages and assign rows
