@@ -224,7 +224,7 @@ export function useUpdateTask() {
       task_type?: string;
       status?: string;
       has_dependencies?: boolean;
-      stages?: { stage_name: string; start_date: string; end_date: string }[];
+      stages?: { stage_name: string; start_date: string; end_date: string; responsible_user_id?: string | null }[];
       dependencies?: { name: string; description: string; release_date: string | null; status: string }[];
     }) => {
       const { id, stages, dependencies, ...fields } = payload;
