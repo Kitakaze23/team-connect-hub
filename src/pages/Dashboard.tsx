@@ -23,6 +23,7 @@ const Dashboard = () => {
   const tabConfig = [
     { id: "team" as Tab, label: "Команда", icon: Users },
     { id: "chat" as Tab, label: "Чат", icon: MessageSquare },
+    { id: "backlog" as Tab, label: "Бэклог", icon: LayoutList },
     { id: "profile" as Tab, label: "Профиль", icon: UserCircle },
     ...(isAdmin ? [{ id: "settings" as Tab, label: "Настройки", icon: Settings }] : []),
   ];
