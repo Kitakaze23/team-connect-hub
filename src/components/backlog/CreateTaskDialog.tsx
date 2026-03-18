@@ -41,12 +41,13 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
 
   const handleSubmit = () => {
     if (!title.trim()) return;
+    const enabledStages = stages.filter(s => s.enabled).map(({ enabled, ...rest }) => rest);
     createTask.mutate(
       {
         title: title.trim(),
         task_type: taskType,
         has_dependencies: hasDeps,
-        stages,
+        stages: enabledStages,
         dependencies: hasDeps ? deps : [],
       },
       {
@@ -55,7 +56,7 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
           setTitle("");
           setTaskType("web");
           setHasDeps(false);
-          setStages(STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek() })));
+          setStages(STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek(), enabled: true })));
           setDeps([]);
         },
       }
