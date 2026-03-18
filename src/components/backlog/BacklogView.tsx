@@ -441,6 +441,7 @@ export default function BacklogView() {
                   </div>
                 </div>
               </div>
+              </React.Fragment>
             ))}
             {visibleTasks.length === 0 && (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">
