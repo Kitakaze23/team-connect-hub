@@ -512,7 +512,7 @@ export default function BacklogView() {
                     className={`absolute top-0 bottom-0 border-r ${borderClass} ${
                       isWeekend ? "bg-destructive/5" : ""
                     }`}
-                    style={{ left: i * colWidth, width: colWidth, height: tasks.length * ROW_HEIGHT || 200, ...borderStyle }}
+                    style={{ left: i * colWidth, width: colWidth, height: visibleTasks.length * ROW_HEIGHT || 200, ...borderStyle }}
                   />
                 );
               })}
