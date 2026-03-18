@@ -15,7 +15,13 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const AppRoutes = () => {
   const { user, loading, membership, membershipLoading, isPlatformAdmin } = useAuth();
