@@ -477,41 +477,65 @@ export default function BacklogView() {
               })}
 
               {/* Task bars */}
-              {tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="relative border-b border-border"
-                  style={{ height: ROW_HEIGHT }}
-                >
-                  {task.stages.map((stage) => {
-                    const x = getX(stage.start_date);
-                    const w = getWidth(stage.start_date, stage.end_date);
-                    const color = STAGE_COLORS[stage.stage_name] || "hsl(var(--accent))";
-                    const isProm = task.status === "prom";
-                    return (
-                      <div
-                        key={stage.id}
-                        className={`absolute top-2 rounded cursor-pointer hover:opacity-80 transition-opacity group`}
-                        style={{
-                          left: x,
-                          width: w,
-                          height: ROW_HEIGHT - 16,
-                          backgroundColor: color,
-                          opacity: isProm ? 0.35 : 0.85,
-                        }}
-                        onClick={() => setSelectedTaskId(task.id)}
-                        title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
-                      >
-                        {w > 60 && (
-                          <span className={`text-[9px] font-medium px-1.5 truncate block leading-[32px] text-white`}>
-                            {STAGE_LABELS[stage.stage_name]}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+              {tasks.map((task) => {
+                // Detect overlapping stages and assign rows
+                const stageRows = task.stages.map((stage, idx) => {
+                  let row = 0;
+                  for (let j = 0; j < idx; j++) {
+                    const prev = task.stages[j];
+                    // Check overlap: stages overlap if one starts before the other ends
+                    if (prev.start_date < stage.end_date && stage.start_date < prev.end_date) {
+                      row++;
+                    }
+                  }
+                  return row;
+                });
+                const maxRow = Math.max(0, ...stageRows);
+                const hasOverlap = maxRow > 0;
+                const barHeight = hasOverlap ? Math.floor((ROW_HEIGHT - 16) / (maxRow + 1)) - 1 : ROW_HEIGHT - 16;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="relative border-b border-border"
+                    style={{ height: ROW_HEIGHT }}
+                  >
+                    {task.stages.map((stage, idx) => {
+                      const x = getX(stage.start_date);
+                      const w = getWidth(stage.start_date, stage.end_date);
+                      const color = STAGE_COLORS[stage.stage_name] || "hsl(var(--accent))";
+                      const isProm = task.status === "prom";
+                      const row = stageRows[idx];
+                      const topOffset = 8 + row * (barHeight + 1);
+                      return (
+                        <div
+                          key={stage.id}
+                          className="absolute rounded cursor-pointer hover:opacity-80 transition-opacity group"
+                          style={{
+                            left: x,
+                            width: w,
+                            top: topOffset,
+                            height: barHeight,
+                            backgroundColor: color,
+                            opacity: isProm ? 0.35 : 0.85,
+                          }}
+                          onClick={() => setSelectedTaskId(task.id)}
+                          title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
+                        >
+                          {w > 60 && barHeight >= 16 && (
+                            <span
+                              className="text-[9px] font-medium px-1.5 truncate block text-white"
+                              style={{ lineHeight: `${barHeight}px` }}
+                            >
+                              {STAGE_LABELS[stage.stage_name]}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
