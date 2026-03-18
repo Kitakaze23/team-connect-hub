@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Flag, Loader2, Archive } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Flag, Loader2, Archive, BarChart3 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useBacklogTasks,
@@ -11,6 +12,7 @@ import {
   STAGE_LABELS,
   STAGE_COLORS,
 } from "@/hooks/useBacklog";
+import { startOfYear, endOfYear, startOfQuarter, endOfQuarter, isWithinInterval } from "date-fns";
 import { MILESTONE_COLORS, MILESTONE_TYPES } from "@/components/backlog/CreateMilestoneDialog";
 import CreateTaskDialog from "@/components/backlog/CreateTaskDialog";
 import CreateMilestoneDialog from "@/components/backlog/CreateMilestoneDialog";
