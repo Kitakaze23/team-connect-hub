@@ -108,9 +108,23 @@ const TeamManagement = () => {
               <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => { setEditingId(t.id); setEditName(t.name); }}>
                 <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
               </Button>
-              <Button size="sm" variant="ghost" className="h-8 px-2 text-destructive" onClick={() => handleDelete(t.id)}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-8 px-2 text-destructive">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Удалить команду?</AlertDialogTitle>
+                    <AlertDialogDescription>Команда «{t.name}» будет удалена безвозвратно.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDelete(t.id)}>Удалить</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
         </div>
