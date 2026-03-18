@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink, Pencil, Plus, Send, Trash2, X, Check } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Send, Trash2, X, Check, Archive } from "lucide-react";
 import {
   BacklogTask,
   STAGE_NAMES,
@@ -24,6 +24,8 @@ import {
   useDeleteStageLink,
 } from "@/hooks/useBacklog";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 
 interface Props {
@@ -42,9 +44,16 @@ const STATUS_LABELS: Record<string, string> = {
 const today = () => format(new Date(), "yyyy-MM-dd");
 const nextWeek = () => format(addDays(new Date(), 7), "yyyy-MM-dd");
 
+interface TeamMember {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+}
+
 export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const { membership } = useAuth();
   const isAdmin = membership?.role === "admin";
+  const companyId = membership?.company_id;
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const { data: comments = [] } = useTaskComments(task?.id ?? null);
@@ -53,6 +62,25 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const { data: allLinks = [] } = useStageLinks(stageIds);
   const addLink = useAddStageLink();
   const removeLink = useDeleteStageLink();
+
+  // Fetch team members for responsible assignment
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["team-members-backlog", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data: members } = await supabase
+        .from("company_members")
+        .select("user_id")
+        .eq("company_id", companyId!)
+        .eq("status", "approved");
+      if (!members?.length) return [];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name")
+        .in("user_id", members.map(m => m.user_id));
+      return (profiles || []) as TeamMember[];
+    },
+  });
 
   const [commentText, setCommentText] = useState("");
   const [newLinkStageId, setNewLinkStageId] = useState<string | null>(null);
@@ -108,29 +136,44 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
     setEditingTitle(false);
   };
 
-  // Stage toggle: which stages are currently active
-  const activeStageNames = new Set(task.stages.map(s => s.stage_name));
-
   const handleToggleStage = (stageName: string, enabled: boolean) => {
     if (enabled) {
-      // Add stage with default dates
       const newStages = [
-        ...task.stages.map(s => ({ stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date })),
-        { stage_name: stageName, start_date: today(), end_date: nextWeek() },
+        ...task.stages.map(s => ({ stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, responsible_user_id: s.responsible_user_id })),
+        { stage_name: stageName, start_date: today(), end_date: nextWeek(), responsible_user_id: null },
       ];
-      // Sort by STAGE_NAMES order
       newStages.sort((a, b) => STAGE_NAMES.indexOf(a.stage_name) - STAGE_NAMES.indexOf(b.stage_name));
       updateTask.mutate({ id: task.id, stages: newStages });
     } else {
-      // Remove stage
       const newStages = task.stages
         .filter(s => s.stage_name !== stageName)
-        .map(s => ({ stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date }));
+        .map(s => ({ stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, responsible_user_id: s.responsible_user_id }));
       updateTask.mutate({ id: task.id, stages: newStages });
     }
   };
 
+  const handleChangeResponsible = (stageId: string, userId: string | null) => {
+    const newStages = task.stages.map(s => ({
+      stage_name: s.stage_name,
+      start_date: s.start_date,
+      end_date: s.end_date,
+      responsible_user_id: s.id === stageId ? userId : s.responsible_user_id,
+    }));
+    updateTask.mutate({ id: task.id, stages: newStages });
+  };
+
+  const handleArchiveToggle = (archived: boolean) => {
+    updateTask.mutate({ id: task.id, status: archived ? "archived" : "development" });
+  };
+
+  const isArchived = task.status === "archived";
   const taskTypeLabel = task.task_type === "web" ? "WEB" : task.task_type === "mobile" ? "Mobile" : "Техническая";
+
+  const getMemberName = (userId: string | null) => {
+    if (!userId) return null;
+    const m = teamMembers.find(t => t.user_id === userId);
+    return m ? `${m.first_name} ${m.last_name}` : null;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -160,11 +203,12 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
               </>
             )}
             <Badge variant="outline" className="ml-2">{taskTypeLabel}</Badge>
+            {isArchived && <Badge variant="secondary" className="ml-1"><Archive className="w-3 h-3 mr-1" />Архив</Badge>}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Status */}
-        <div className="flex items-center gap-3">
+        {/* Status + Archive */}
+        <div className="flex items-center gap-3 flex-wrap">
           <Label>Статус:</Label>
           {isAdmin ? (
             <Select value={task.status} onValueChange={handleStatusChange}>
@@ -177,6 +221,16 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
             </Select>
           ) : (
             <Badge>{STATUS_LABELS[task.status] || task.status}</Badge>
+          )}
+          {isAdmin && (
+            <label className="flex items-center gap-2 ml-auto cursor-pointer text-sm text-muted-foreground">
+              <Checkbox
+                checked={isArchived}
+                onCheckedChange={(checked) => handleArchiveToggle(!!checked)}
+              />
+              <Archive className="w-4 h-4" />
+              В архив
+            </label>
           )}
         </div>
 
@@ -191,6 +245,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
               const isActive = !!stage;
               const links = stage ? allLinks.filter((l) => l.stage_id === stage.id) : [];
               const isEditingDates = stage && editingStageId === stage.id;
+              const responsibleName = stage ? getMemberName(stage.responsible_user_id) : null;
 
               return (
                 <div key={stageName} className={`border border-border rounded-lg p-3 ${!isActive ? "opacity-50" : ""}`}>
@@ -216,8 +271,8 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                               if (editStartDate && editEndDate) {
                                 const newStages = task.stages.map(s =>
                                   s.id === stage.id
-                                    ? { stage_name: s.stage_name, start_date: editStartDate, end_date: editEndDate }
-                                    : { stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date }
+                                    ? { stage_name: s.stage_name, start_date: editStartDate, end_date: editEndDate, responsible_user_id: s.responsible_user_id }
+                                    : { stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, responsible_user_id: s.responsible_user_id }
                                 );
                                 updateTask.mutate({ id: task.id, stages: newStages });
                               }
@@ -242,6 +297,32 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                       </span>
                     )}
                   </div>
+
+                  {/* Responsible person */}
+                  {stage && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Ответственный:</span>
+                      {isAdmin ? (
+                        <Select
+                          value={stage.responsible_user_id || "__none__"}
+                          onValueChange={(v) => handleChangeResponsible(stage.id, v === "__none__" ? null : v)}
+                        >
+                          <SelectTrigger className="h-7 text-xs w-48"><SelectValue placeholder="Не назначен" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Не назначен</SelectItem>
+                            {teamMembers.map(m => (
+                              <SelectItem key={m.user_id} value={m.user_id}>
+                                {m.first_name} {m.last_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-foreground">{responsibleName || "Не назначен"}</span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Links */}
                   {stage && links.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
