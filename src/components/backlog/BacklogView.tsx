@@ -171,19 +171,24 @@ export default function BacklogView() {
             {tasks.map((task) => (
               <div
                 key={task.id}
-                className="flex items-center px-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors"
+                className={`flex items-center px-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
+                  task.status === "prom" ? "opacity-50 bg-muted" : ""
+                }`}
                 style={{ height: ROW_HEIGHT }}
                 onClick={() => setSelectedTask(task)}
               >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate text-foreground">{task.title}</div>
-                  <div className="flex gap-1 items-center">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
-                      {TASK_TYPE_LABELS[task.task_type] || task.task_type}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {STATUS_LABELS[task.status] || task.status}
-                    </span>
+                <div className="min-w-0 flex items-center gap-1.5">
+                  {task.status === "backlog" && <Archive className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                  <div>
+                    <div className="text-sm font-medium truncate text-foreground">{task.title}</div>
+                    <div className="flex gap-1 items-center">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
+                        {TASK_TYPE_LABELS[task.task_type] || task.task_type}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {STATUS_LABELS[task.status] || task.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
