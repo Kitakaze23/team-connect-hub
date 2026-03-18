@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Trash2 } from "lucide-react";
 import { STAGE_NAMES, STAGE_LABELS, useCreateTask } from "@/hooks/useBacklog";
 import { format, addDays } from "date-fns";
 
