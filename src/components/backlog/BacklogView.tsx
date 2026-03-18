@@ -19,6 +19,8 @@ import EditMilestoneDialog from "@/components/backlog/EditMilestoneDialog";
 import TaskDetailDialog from "@/components/backlog/TaskDetailDialog";
 import { addDays, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, format, parseISO, isWithinInterval } from "date-fns";
 import { ru } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 function BacklogStats({ tasks }: { tasks: BacklogTask[] }) {
   const now = new Date();
