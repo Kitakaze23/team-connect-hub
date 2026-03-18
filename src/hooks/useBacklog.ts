@@ -24,6 +24,7 @@ export interface BacklogStage {
   start_date: string;
   end_date: string;
   sort_order: number;
+  responsible_user_id: string | null;
 }
 
 export interface BacklogDependency {
@@ -223,7 +224,7 @@ export function useUpdateTask() {
       task_type?: string;
       status?: string;
       has_dependencies?: boolean;
-      stages?: { stage_name: string; start_date: string; end_date: string }[];
+      stages?: { stage_name: string; start_date: string; end_date: string; responsible_user_id?: string | null }[];
       dependencies?: { name: string; description: string; release_date: string | null; status: string }[];
     }) => {
       const { id, stages, dependencies, ...fields } = payload;
@@ -237,7 +238,7 @@ export function useUpdateTask() {
         await supabase.from("backlog_task_stages").delete().eq("task_id", id);
         if (stages.length) {
           const { error } = await supabase.from("backlog_task_stages").insert(
-            stages.map((s, i) => ({ task_id: id, stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, sort_order: i }))
+            stages.map((s, i) => ({ task_id: id, stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, sort_order: i, responsible_user_id: s.responsible_user_id || null }))
           );
           if (error) throw error;
         }

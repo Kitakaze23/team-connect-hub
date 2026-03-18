@@ -117,6 +117,7 @@ const STATUS_LABELS: Record<string, string> = {
   development: "Разработка",
   prom: "ПРОМ",
   cancelled: "Отменена",
+  archived: "Архив",
 };
 
 const TASK_TYPE_LABELS: Record<string, string> = {
@@ -141,14 +142,18 @@ export default function BacklogView() {
   const { data: tasks = [], isLoading: tasksLoading } = useBacklogTasks();
   const { data: milestones = [], isLoading: milestonesLoading } = useBacklogMilestones();
   const reorderTasks = useReorderTasks();
+  const [showArchive, setShowArchive] = useState(false);
 
   const moveTask = useCallback((index: number, direction: "up" | "down") => {
+    const vt = showArchive ? tasks.filter(t => t.status === "archived") : tasks.filter(t => t.status !== "archived");
     const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= tasks.length) return;
-    const ids = tasks.map(t => t.id);
-    [ids[index], ids[newIndex]] = [ids[newIndex], ids[index]];
-    reorderTasks.mutate(ids);
-  }, [tasks, reorderTasks]);
+    if (newIndex < 0 || newIndex >= vt.length) return;
+    const allIds = tasks.map(t => t.id);
+    const actualIdx = allIds.indexOf(vt[index].id);
+    const actualNewIdx = allIds.indexOf(vt[newIndex].id);
+    [allIds[actualIdx], allIds[actualNewIdx]] = [allIds[actualNewIdx], allIds[actualIdx]];
+    reorderTasks.mutate(allIds);
+  }, [tasks, reorderTasks, showArchive]);
 
   const { data: sprintSettings } = useQuery({
     queryKey: ["sprint-settings", companyId],
@@ -181,6 +186,11 @@ export default function BacklogView() {
   const [editingMilestone, setEditingMilestone] = useState<BacklogMilestone | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const visibleTasks = useMemo(() =>
+    showArchive ? tasks.filter(t => t.status === "archived") : tasks.filter(t => t.status !== "archived"),
+    [tasks, showArchive]
+  );
+
   const scaleUnit = getScaleUnit(period);
 
   const { timelineStart, timelineEnd, columns, colWidth } = useMemo(() => {
@@ -205,7 +215,7 @@ export default function BacklogView() {
     }
 
     // Extend range to cover all tasks and milestones
-    tasks.forEach((t) => {
+    visibleTasks.forEach((t) => {
       t.stages.forEach((s) => {
         const sd = parseISO(s.start_date);
         const ed = parseISO(s.end_date);
@@ -237,7 +247,7 @@ export default function BacklogView() {
     }
 
     return { timelineStart: start, timelineEnd: end, columns: cols, colWidth: cw };
-  }, [period, tasks, milestones, scaleUnit]);
+  }, [period, visibleTasks, milestones, scaleUnit]);
 
   const totalWidth = columns.length * colWidth;
 
@@ -354,6 +364,16 @@ export default function BacklogView() {
           </SelectContent>
         </Select>
         <BacklogStats tasks={tasks} />
+        <Button
+          size="sm"
+          variant={showArchive ? "default" : "outline"}
+          onClick={() => setShowArchive(!showArchive)}
+        >
+          <Archive className="w-4 h-4 mr-1" /> Архив
+          {tasks.filter(t => t.status === "archived").length > 0 && (
+            <span className="ml-1 text-xs">({tasks.filter(t => t.status === "archived").length})</span>
+          )}
+        </Button>
         {isAdmin && (
           <>
             <Button size="sm" variant="outline" onClick={() => setCreateMilestoneOpen(true)}>
@@ -376,7 +396,7 @@ export default function BacklogView() {
             </div>
           </div>
           <div className="overflow-y-auto" style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
-            {tasks.map((task, taskIndex) => (
+            {visibleTasks.map((task, taskIndex) => (
               <div
                 key={task.id}
                 className={`flex items-center px-2 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
@@ -396,7 +416,7 @@ export default function BacklogView() {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); moveTask(taskIndex, "down"); }}
-                      disabled={taskIndex === tasks.length - 1}
+                      disabled={taskIndex === visibleTasks.length - 1}
                       className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
                     >
                       <ChevronDown className="w-3.5 h-3.5" />
@@ -419,9 +439,9 @@ export default function BacklogView() {
                 </div>
               </div>
             ))}
-            {tasks.length === 0 && (
+            {visibleTasks.length === 0 && (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                Нет задач
+                {showArchive ? "Нет архивных задач" : "Нет задач"}
               </div>
             )}
           </div>
@@ -492,7 +512,7 @@ export default function BacklogView() {
                     className={`absolute top-0 bottom-0 border-r ${borderClass} ${
                       isWeekend ? "bg-destructive/5" : ""
                     }`}
-                    style={{ left: i * colWidth, width: colWidth, height: tasks.length * ROW_HEIGHT || 200, ...borderStyle }}
+                    style={{ left: i * colWidth, width: colWidth, height: visibleTasks.length * ROW_HEIGHT || 200, ...borderStyle }}
                   />
                 );
               })}
@@ -508,7 +528,7 @@ export default function BacklogView() {
                   <div
                     key={m.id}
                     className={`absolute top-0 z-20 ${isAdmin ? "cursor-pointer" : "pointer-events-none"}`}
-                    style={{ left: x + colWidth / 2, height: tasks.length * ROW_HEIGHT || 200 }}
+                    style={{ left: x + colWidth / 2, height: visibleTasks.length * ROW_HEIGHT || 200 }}
                     onClick={() => isAdmin && setEditingMilestone(m)}
                   >
                     <div className="w-px h-full" style={{ backgroundColor: color, opacity: 0.6 }} />
@@ -523,7 +543,7 @@ export default function BacklogView() {
               })}
 
               {/* Task bars */}
-              {tasks.map((task) => {
+              {visibleTasks.map((task) => {
                 // Detect overlapping stages and assign rows
                 const stageRows = task.stages.map((stage, idx) => {
                   let row = 0;
