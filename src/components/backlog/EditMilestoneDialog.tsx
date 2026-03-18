@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +26,6 @@ export default function EditMilestoneDialog({ milestone, open, onOpenChange }: P
     if (milestone) {
       setDate(milestone.date);
       setType(milestone.milestone_type);
-      // If name differs from default type label, it's a custom name
       const defaultName = MILESTONE_TYPES[milestone.milestone_type] || "";
       setCustomName(milestone.name !== defaultName ? milestone.name : "");
     }
@@ -77,9 +77,25 @@ export default function EditMilestoneDialog({ milestone, open, onOpenChange }: P
           </div>
         </div>
         <div className="flex justify-between pt-4">
-          <Button variant="destructive" size="sm" onClick={handleDelete}>
-            <Trash2 className="w-4 h-4 mr-1" /> Удалить
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">
+                <Trash2 className="w-4 h-4 mr-1" /> Удалить
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Удалить отсечку?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Отсечка «{milestone.name}» будет удалена безвозвратно.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete}>Удалить</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
             <Button onClick={handleSave} disabled={update.isPending}>Сохранить</Button>

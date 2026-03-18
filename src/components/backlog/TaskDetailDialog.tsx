@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ExternalLink, Pencil, Plus, Send, Trash2, X, Check } from "lucide-react";
 import {
   BacklogTask,
+  STAGE_NAMES,
   STAGE_LABELS,
   STAGE_COLORS,
   useUpdateTask,
@@ -21,7 +24,7 @@ import {
   useDeleteStageLink,
 } from "@/hooks/useBacklog";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 
 interface Props {
   task: BacklogTask | null;
@@ -35,6 +38,9 @@ const STATUS_LABELS: Record<string, string> = {
   prom: "ПРОМ",
   cancelled: "Отменена",
 };
+
+const today = () => format(new Date(), "yyyy-MM-dd");
+const nextWeek = () => format(addDays(new Date(), 7), "yyyy-MM-dd");
 
 export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const { membership } = useAuth();
@@ -102,6 +108,28 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
     setEditingTitle(false);
   };
 
+  // Stage toggle: which stages are currently active
+  const activeStageNames = new Set(task.stages.map(s => s.stage_name));
+
+  const handleToggleStage = (stageName: string, enabled: boolean) => {
+    if (enabled) {
+      // Add stage with default dates
+      const newStages = [
+        ...task.stages.map(s => ({ stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date })),
+        { stage_name: stageName, start_date: today(), end_date: nextWeek() },
+      ];
+      // Sort by STAGE_NAMES order
+      newStages.sort((a, b) => STAGE_NAMES.indexOf(a.stage_name) - STAGE_NAMES.indexOf(b.stage_name));
+      updateTask.mutate({ id: task.id, stages: newStages });
+    } else {
+      // Remove stage
+      const newStages = task.stages
+        .filter(s => s.stage_name !== stageName)
+        .map(s => ({ stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date }));
+      updateTask.mutate({ id: task.id, stages: newStages });
+    }
+  };
+
   const taskTypeLabel = task.task_type === "web" ? "WEB" : task.task_type === "mobile" ? "Mobile" : "Техническая";
 
   return (
@@ -158,51 +186,64 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
         <div>
           <Label className="font-semibold text-base">Этапы</Label>
           <div className="space-y-2 mt-2">
-           {task.stages.map((stage) => {
-              const links = allLinks.filter((l) => l.stage_id === stage.id);
-              const isEditingDates = editingStageId === stage.id;
+            {STAGE_NAMES.map((stageName) => {
+              const stage = task.stages.find(s => s.stage_name === stageName);
+              const isActive = !!stage;
+              const links = stage ? allLinks.filter((l) => l.stage_id === stage.id) : [];
+              const isEditingDates = stage && editingStageId === stage.id;
+
               return (
-                <div key={stage.id} className="border border-border rounded-lg p-3">
+                <div key={stageName} className={`border border-border rounded-lg p-3 ${!isActive ? "opacity-50" : ""}`}>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STAGE_COLORS[stage.stage_name] }} />
-                    <span className="font-medium text-sm">{STAGE_LABELS[stage.stage_name]}</span>
-                    <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
-                      {isEditingDates ? (
-                        <div className="flex gap-1 items-center">
-                          <Input type="date" className="h-7 text-xs w-32" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
-                          <span>—</span>
-                          <Input type="date" className="h-7 text-xs w-32" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} />
-                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => {
-                            if (editStartDate && editEndDate) {
-                              const newStages = task.stages.map(s =>
-                                s.id === stage.id
-                                  ? { stage_name: s.stage_name, start_date: editStartDate, end_date: editEndDate }
-                                  : { stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date }
-                              );
-                              updateTask.mutate({ id: task.id, stages: newStages });
-                            }
-                            setEditingStageId(null);
-                          }}>✓</Button>
-                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageId(null)}><X className="w-3 h-3" /></Button>
-                        </div>
-                      ) : (
-                        <>
-                          {format(new Date(stage.start_date), "dd.MM.yyyy")} — {format(new Date(stage.end_date), "dd.MM.yyyy")}
-                          {isAdmin && (
-                            <button className="text-muted-foreground hover:text-foreground" onClick={() => {
-                              setEditingStageId(stage.id);
-                              setEditStartDate(stage.start_date);
-                              setEditEndDate(stage.end_date);
-                            }}>
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          )}
-                        </>
-                      )}
+                    {isAdmin && (
+                      <Checkbox
+                        checked={isActive}
+                        onCheckedChange={(checked) => handleToggleStage(stageName, !!checked)}
+                      />
+                    )}
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STAGE_COLORS[stageName] }} />
+                    <span className={`font-medium text-sm ${!isActive ? "line-through text-muted-foreground" : ""}`}>
+                      {STAGE_LABELS[stageName]}
                     </span>
+                    {stage && (
+                      <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+                        {isEditingDates ? (
+                          <div className="flex gap-1 items-center">
+                            <Input type="date" className="h-7 text-xs w-32" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
+                            <span>—</span>
+                            <Input type="date" className="h-7 text-xs w-32" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} />
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => {
+                              if (editStartDate && editEndDate) {
+                                const newStages = task.stages.map(s =>
+                                  s.id === stage.id
+                                    ? { stage_name: s.stage_name, start_date: editStartDate, end_date: editEndDate }
+                                    : { stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date }
+                                );
+                                updateTask.mutate({ id: task.id, stages: newStages });
+                              }
+                              setEditingStageId(null);
+                            }}>✓</Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingStageId(null)}><X className="w-3 h-3" /></Button>
+                          </div>
+                        ) : (
+                          <>
+                            {format(new Date(stage.start_date), "dd.MM.yyyy")} — {format(new Date(stage.end_date), "dd.MM.yyyy")}
+                            {isAdmin && (
+                              <button className="text-muted-foreground hover:text-foreground" onClick={() => {
+                                setEditingStageId(stage.id);
+                                setEditStartDate(stage.start_date);
+                                setEditEndDate(stage.end_date);
+                              }}>
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </span>
+                    )}
                   </div>
                   {/* Links */}
-                  {links.length > 0 && (
+                  {stage && links.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {links.map((link) => (
                         <div key={link.id} className="flex items-center gap-1 bg-secondary rounded px-2 py-0.5">
@@ -211,15 +252,29 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                             {link.label || link.url}
                           </a>
                           {isAdmin && (
-                            <button onClick={() => removeLink.mutate(link.id)} className="text-muted-foreground hover:text-destructive">
-                              <X className="w-3 h-3" />
-                            </button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <button className="text-muted-foreground hover:text-destructive">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Удалить ссылку?</AlertDialogTitle>
+                                  <AlertDialogDescription>Ссылка «{link.label || link.url}» будет удалена.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Отмена</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => removeLink.mutate(link.id)}>Удалить</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                         </div>
                       ))}
                     </div>
                   )}
-                  {isAdmin && (
+                  {isAdmin && stage && (
                     <div className="mt-1">
                       {newLinkStageId === stage.id ? (
                         <div className="flex gap-1 items-center">
@@ -332,9 +387,25 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
 
         {isAdmin && (
           <div className="flex justify-end pt-2">
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="w-4 h-4 mr-1" /> Удалить задачу
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="w-4 h-4 mr-1" /> Удалить задачу
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Удалить задачу?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Задача «{task.title}» и все связанные данные (этапы, ссылки, комментарии) будут удалены безвозвратно.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Отмена</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>Удалить</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
       </DialogContent>
