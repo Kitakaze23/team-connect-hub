@@ -259,14 +259,29 @@ const CompanySettings = () => {
                   >
                     {m.role === "admin" ? <ShieldOff className="w-4 h-4 text-muted-foreground" /> : <Shield className="w-4 h-4 text-accent" />}
                   </Button>
-                  <Button
-                    size="sm" variant="ghost"
-                    onClick={() => handleRemoveMember(m.id, m.user_id)}
-                    className="h-8 px-2 text-destructive"
-                    title="Удалить из компании"
-                  >
-                    <UserMinus className="w-4 h-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm" variant="ghost"
+                        className="h-8 px-2 text-destructive"
+                        title="Удалить из компании"
+                      >
+                        <UserMinus className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Удалить сотрудника?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {m.first_name} {m.last_name} будет удалён из компании.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleRemoveMember(m.id, m.user_id)}>Удалить</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               )}
             </div>
