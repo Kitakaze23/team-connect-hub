@@ -144,12 +144,16 @@ export default function BacklogView() {
   const reorderTasks = useReorderTasks();
 
   const moveTask = useCallback((index: number, direction: "up" | "down") => {
+    const vt = showArchive ? tasks.filter(t => t.status === "archived") : tasks.filter(t => t.status !== "archived");
     const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= tasks.length) return;
-    const ids = tasks.map(t => t.id);
-    [ids[index], ids[newIndex]] = [ids[newIndex], ids[index]];
-    reorderTasks.mutate(ids);
-  }, [tasks, reorderTasks]);
+    if (newIndex < 0 || newIndex >= vt.length) return;
+    const allIds = tasks.map(t => t.id);
+    // Find actual indices in the full list
+    const actualIdx = allIds.indexOf(vt[index].id);
+    const actualNewIdx = allIds.indexOf(vt[newIndex].id);
+    [allIds[actualIdx], allIds[actualNewIdx]] = [allIds[actualNewIdx], allIds[actualIdx]];
+    reorderTasks.mutate(allIds);
+  }, [tasks, reorderTasks, showArchive]);
 
   const { data: sprintSettings } = useQuery({
     queryKey: ["sprint-settings", companyId],
