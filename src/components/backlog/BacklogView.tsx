@@ -554,7 +554,6 @@ export default function BacklogView() {
               {(() => {
                 const todayX = getX(format(new Date(), "yyyy-MM-dd"));
                 if (todayX >= 0 && todayX <= totalWidth) {
-                if (todayX >= 0 && todayX <= totalWidth) {
                   return (
                     <div
                       className="absolute top-0 z-30 pointer-events-none"
