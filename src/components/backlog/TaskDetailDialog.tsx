@@ -244,7 +244,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
               const stage = task.stages.find(s => s.stage_name === stageName);
               const isActive = !!stage;
               const links = stage ? allLinks.filter((l) => l.stage_id === stage.id) : [];
-              const isEditingDates = stage && editingStageId === stage.id;
+              const isEditingDates = isActive && editingStageName === stageName;
               const responsibleName = stage ? getMemberName(stage.responsible_user_id) : null;
 
               return (
