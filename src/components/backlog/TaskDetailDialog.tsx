@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Plus, Send, Trash2, X } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import {
   BacklogTask,
   STAGE_LABELS,
