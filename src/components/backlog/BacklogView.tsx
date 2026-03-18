@@ -552,8 +552,8 @@ export default function BacklogView() {
                       className="absolute top-0 z-30 pointer-events-none"
                       style={{ left: todayX + colWidth / 2, height: gridHeight }}
                     >
-                      <div className="w-0.5 h-full bg-red-900/80" />
-                      <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap bg-red-900 text-white">
+                      <div className="w-0.5 h-full" style={{ backgroundColor: "hsl(345, 80%, 25%)" }} />
+                      <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap text-white" style={{ backgroundColor: "hsl(345, 80%, 25%)" }}>
                         Сегодня
                       </div>
                     </div>
