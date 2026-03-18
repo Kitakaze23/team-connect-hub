@@ -25,18 +25,41 @@ function BacklogStats({ tasks }: { tasks: BacklogTask[] }) {
   const yearInterval = { start: startOfYear(now), end: endOfYear(now) };
   const quarterInterval = { start: startOfQuarter(now), end: endOfQuarter(now) };
 
-  const tasksInYear = tasks.filter(t => t.stages.some(s => isWithinInterval(parseISO(s.start_date), yearInterval) || isWithinInterval(parseISO(s.end_date), yearInterval))).length;
-  const tasksInQuarter = tasks.filter(t => t.stages.some(s => isWithinInterval(parseISO(s.start_date), quarterInterval) || isWithinInterval(parseISO(s.end_date), quarterInterval))).length;
-  const tasksInWork = tasks.filter(t => t.status === "development").length;
-  const tasksDone = tasks.filter(t => t.status === "prom").length;
-  const tasksBacklog = tasks.filter(t => t.status === "backlog").length;
+  const inInterval = (t: BacklogTask, interval: { start: Date; end: Date }) =>
+    t.stages.some(s => isWithinInterval(parseISO(s.start_date), interval) || isWithinInterval(parseISO(s.end_date), interval));
+
+  const tasksInYear = tasks.filter(t => inInterval(t, yearInterval));
+  const tasksInQuarter = tasks.filter(t => inInterval(t, quarterInterval));
+  const tasksInWork = tasks.filter(t => t.status === "development");
+  const tasksDone = tasks.filter(t => t.status === "prom");
+  const tasksBacklog = tasks.filter(t => t.status === "backlog");
+
+  const byType = (list: BacklogTask[]) => ({
+    total: list.length,
+    web: list.filter(t => t.task_type === "web").length,
+    mobile: list.filter(t => t.task_type === "mobile").length,
+    tech: list.filter(t => t.task_type === "technical").length,
+  });
 
   const stats = [
-    { label: "В году", value: tasksInYear },
-    { label: "В квартале", value: tasksInQuarter },
-    { label: "В работе", value: tasksInWork },
-    { label: "Завершено", value: tasksDone },
-    { label: "Бэклог", value: tasksBacklog },
+    { label: "В году", ...byType(tasksInYear) },
+    { label: "В квартале", ...byType(tasksInQuarter) },
+    { label: "В работе", ...byType(tasksInWork) },
+    { label: "Завершено", ...byType(tasksDone) },
+    { label: "Бэклог", ...byType(tasksBacklog) },
+  ];
+
+  // Tasks currently at a specific stage (active = status is development)
+  const activeTasks = tasks.filter(t => t.status === "development");
+  const nowStr = format(now, "yyyy-MM-dd");
+  const atStageNow = (stageName: string) =>
+    activeTasks.filter(t => t.stages.some(s => s.stage_name === stageName && s.start_date <= nowStr && s.end_date >= nowStr)).length;
+
+  const roleStats = [
+    { label: "Дизайн", value: atStageNow("design") },
+    { label: "Аналитика", value: atStageNow("analytics") },
+    { label: "Разработка", value: atStageNow("development") },
+    { label: "Тестирование", value: atStageNow("testing") },
   ];
 
   return (
@@ -46,15 +69,36 @@ function BacklogStats({ tasks }: { tasks: BacklogTask[] }) {
           <BarChart3 className="w-4 h-4 mr-1" /> Статистика
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-3">
-        <div className="space-y-2">
+      <PopoverContent className="w-80 p-3">
+        <div className="space-y-3">
           <p className="text-sm font-semibold">Статистика задач</p>
+          {/* Header */}
+          <div className="grid grid-cols-5 gap-1 text-[10px] text-muted-foreground font-medium">
+            <span></span>
+            <span className="text-center">Все</span>
+            <span className="text-center">WEB</span>
+            <span className="text-center">Mob</span>
+            <span className="text-center">Тех</span>
+          </div>
           {stats.map(s => (
-            <div key={s.label} className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{s.label}</span>
-              <span className="font-medium">{s.value}</span>
+            <div key={s.label} className="grid grid-cols-5 gap-1 text-sm">
+              <span className="text-muted-foreground text-xs">{s.label}</span>
+              <span className="font-medium text-center">{s.total}</span>
+              <span className="text-center text-muted-foreground">{s.web}</span>
+              <span className="text-center text-muted-foreground">{s.mobile}</span>
+              <span className="text-center text-muted-foreground">{s.tech}</span>
             </div>
           ))}
+
+          <div className="border-t border-border pt-2">
+            <p className="text-xs font-semibold mb-1">Загрузка по ролям (сейчас)</p>
+            {roleStats.map(s => (
+              <div key={s.label} className="flex justify-between text-sm">
+                <span className="text-muted-foreground text-xs">{s.label}</span>
+                <span className="font-medium">{s.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </PopoverContent>
     </Popover>
