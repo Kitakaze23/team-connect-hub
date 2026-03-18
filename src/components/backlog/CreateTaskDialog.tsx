@@ -92,19 +92,29 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
             <Label className="font-semibold">Этапы</Label>
             <div className="space-y-2 mt-2">
               {stages.map((stage, idx) => (
-                <div key={stage.stage_name} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                  <span className="text-sm text-muted-foreground">{STAGE_LABELS[stage.stage_name]}</span>
+                <div key={stage.stage_name} className="grid grid-cols-[auto_1fr_auto_auto] gap-2 items-center">
+                  <Checkbox
+                    checked={stage.enabled}
+                    onCheckedChange={(checked) =>
+                      setStages((prev) => prev.map((s, i) => (i === idx ? { ...s, enabled: !!checked } : s)))
+                    }
+                  />
+                  <span className={`text-sm ${stage.enabled ? "text-muted-foreground" : "text-muted-foreground/40 line-through"}`}>
+                    {STAGE_LABELS[stage.stage_name]}
+                  </span>
                   <Input
                     type="date"
                     value={stage.start_date}
                     onChange={(e) => updateStage(idx, "start_date", e.target.value)}
                     className="w-36"
+                    disabled={!stage.enabled}
                   />
                   <Input
                     type="date"
                     value={stage.end_date}
                     onChange={(e) => updateStage(idx, "end_date", e.target.value)}
                     className="w-36"
+                    disabled={!stage.enabled}
                   />
                 </div>
               ))}
