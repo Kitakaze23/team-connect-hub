@@ -7,17 +7,21 @@ import {
   useBacklogTasks,
   useBacklogMilestones,
   BacklogTask,
+  BacklogMilestone,
   STAGE_LABELS,
   STAGE_COLORS,
 } from "@/hooks/useBacklog";
 import { MILESTONE_COLORS, MILESTONE_TYPES } from "@/components/backlog/CreateMilestoneDialog";
 import CreateTaskDialog from "@/components/backlog/CreateTaskDialog";
 import CreateMilestoneDialog from "@/components/backlog/CreateMilestoneDialog";
+import EditMilestoneDialog from "@/components/backlog/EditMilestoneDialog";
 import TaskDetailDialog from "@/components/backlog/TaskDetailDialog";
-import { addDays, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, eachDayOfInterval, eachWeekOfInterval, format, isSameMonth, parseISO } from "date-fns";
+import { addDays, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
-type Period = "week" | "month" | "quarter" | "custom";
+type Period = "week" | "month" | "quarter" | "year";
+
+type ScaleUnit = "day" | "week" | "month";
 
 const STATUS_LABELS: Record<string, string> = {
   backlog: "Бэклог",
@@ -32,6 +36,15 @@ const TASK_TYPE_LABELS: Record<string, string> = {
   technical: "Тех",
 };
 
+function getScaleUnit(period: Period): ScaleUnit {
+  switch (period) {
+    case "week": return "day";
+    case "month": return "day";
+    case "quarter": return "week";
+    case "year": return "month";
+  }
+}
+
 export default function BacklogView() {
   const { membership } = useAuth();
   const isAdmin = membership?.role === "admin";
@@ -42,10 +55,12 @@ export default function BacklogView() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [createMilestoneOpen, setCreateMilestoneOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<BacklogTask | null>(null);
+  const [editingMilestone, setEditingMilestone] = useState<BacklogMilestone | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Calculate timeline range
-  const { timelineStart, timelineEnd, days, dayWidth } = useMemo(() => {
+  const scaleUnit = getScaleUnit(period);
+
+  const { timelineStart, timelineEnd, columns, colWidth } = useMemo(() => {
     const now = new Date();
     let start: Date, end: Date;
     switch (period) {
@@ -57,12 +72,16 @@ export default function BacklogView() {
         start = startOfQuarter(now);
         end = endOfQuarter(now);
         break;
-      default: // month
+      case "year":
+        start = startOfYear(now);
+        end = endOfYear(now);
+        break;
+      default:
         start = startOfMonth(now);
         end = endOfMonth(now);
     }
 
-    // Extend range to cover all tasks
+    // Extend range to cover all tasks and milestones
     tasks.forEach((t) => {
       t.stages.forEach((s) => {
         const sd = parseISO(s.start_date);
@@ -71,52 +90,111 @@ export default function BacklogView() {
         if (ed > end) end = ed;
       });
     });
-
     milestones.forEach((m) => {
       const md = parseISO(m.date);
       if (md < start) start = md;
       if (md > end) end = md;
     });
 
-    // Add padding
     start = addDays(start, -1);
     end = addDays(end, 2);
 
-    const daysArr = eachDayOfInterval({ start, end });
-    const totalDays = daysArr.length;
-    const dw = period === "quarter" ? 24 : period === "week" ? 80 : 36;
+    let cols: Date[];
+    let cw: number;
 
-    return { timelineStart: start, timelineEnd: end, days: daysArr, dayWidth: dw };
-  }, [period, tasks, milestones]);
+    if (scaleUnit === "day") {
+      cols = eachDayOfInterval({ start, end });
+      cw = period === "week" ? 80 : 36;
+    } else if (scaleUnit === "week") {
+      cols = eachWeekOfInterval({ start, end }, { weekStartsOn: 1 });
+      cw = 48;
+    } else {
+      cols = eachMonthOfInterval({ start, end });
+      cw = 80;
+    }
 
-  const totalWidth = days.length * dayWidth;
+    return { timelineStart: start, timelineEnd: end, columns: cols, colWidth: cw };
+  }, [period, tasks, milestones, scaleUnit]);
 
+  const totalWidth = columns.length * colWidth;
+
+  // Compute position based on scale unit
   const getX = (dateStr: string) => {
     const d = parseISO(dateStr);
-    const diff = differenceInDays(d, days[0]);
-    return diff * dayWidth;
+    if (scaleUnit === "day") {
+      const diff = differenceInDays(d, columns[0]);
+      return diff * colWidth;
+    } else if (scaleUnit === "week") {
+      const diffDays = differenceInDays(d, columns[0]);
+      return (diffDays / 7) * colWidth;
+    } else {
+      // month scale: interpolate
+      const diffDays = differenceInDays(d, columns[0]);
+      const totalDays = differenceInDays(columns[columns.length - 1], columns[0]) || 1;
+      return (diffDays / totalDays) * totalWidth;
+    }
   };
 
   const getWidth = (startDate: string, endDate: string) => {
-    const diff = differenceInDays(parseISO(endDate), parseISO(startDate));
-    return Math.max(diff * dayWidth, dayWidth);
+    const x1 = getX(startDate);
+    const x2 = getX(endDate);
+    return Math.max(x2 - x1, colWidth / 2);
   };
 
-  // Group header dates
-  const monthHeaders = useMemo(() => {
-    const headers: { label: string; startIdx: number; count: number }[] = [];
-    let current = "";
-    days.forEach((d, i) => {
-      const key = format(d, "yyyy-MM");
-      if (key !== current) {
-        current = key;
-        headers.push({ label: format(d, "LLLL yyyy", { locale: ru }), startIdx: i, count: 1 });
-      } else {
-        headers[headers.length - 1].count++;
-      }
-    });
-    return headers;
-  }, [days]);
+  // Group headers
+  const groupHeaders = useMemo(() => {
+    if (scaleUnit === "day") {
+      const headers: { label: string; startIdx: number; count: number }[] = [];
+      let current = "";
+      columns.forEach((d, i) => {
+        const key = format(d, "yyyy-MM");
+        if (key !== current) {
+          current = key;
+          headers.push({ label: format(d, "LLLL yyyy", { locale: ru }), startIdx: i, count: 1 });
+        } else {
+          headers[headers.length - 1].count++;
+        }
+      });
+      return headers;
+    } else if (scaleUnit === "week") {
+      const headers: { label: string; startIdx: number; count: number }[] = [];
+      let current = "";
+      columns.forEach((d, i) => {
+        const key = format(d, "yyyy-MM");
+        if (key !== current) {
+          current = key;
+          headers.push({ label: format(d, "LLLL yyyy", { locale: ru }), startIdx: i, count: 1 });
+        } else {
+          headers[headers.length - 1].count++;
+        }
+      });
+      return headers;
+    } else {
+      // month scale - group by year
+      const headers: { label: string; startIdx: number; count: number }[] = [];
+      let current = "";
+      columns.forEach((d, i) => {
+        const key = format(d, "yyyy");
+        if (key !== current) {
+          current = key;
+          headers.push({ label: key, startIdx: i, count: 1 });
+        } else {
+          headers[headers.length - 1].count++;
+        }
+      });
+      return headers;
+    }
+  }, [columns, scaleUnit]);
+
+  const getColLabel = (d: Date, i: number) => {
+    if (scaleUnit === "day") {
+      return colWidth >= 30 ? format(d, "d") : (i % 2 === 0 ? format(d, "d") : "");
+    } else if (scaleUnit === "week") {
+      return format(d, "d.MM");
+    } else {
+      return format(d, "LLL", { locale: ru });
+    }
+  };
 
   if (tasksLoading || milestonesLoading) {
     return (
@@ -144,6 +222,7 @@ export default function BacklogView() {
             <SelectItem value="week">Неделя</SelectItem>
             <SelectItem value="month">Месяц</SelectItem>
             <SelectItem value="quarter">Квартал</SelectItem>
+            <SelectItem value="year">Год</SelectItem>
           </SelectContent>
         </Select>
         {isAdmin && (
@@ -206,31 +285,31 @@ export default function BacklogView() {
           <div style={{ width: totalWidth, minHeight: "100%" }}>
             {/* Date headers */}
             <div className="sticky top-0 z-10 bg-card border-b border-border" style={{ height: HEADER_HEIGHT }}>
-              {/* Month row */}
+              {/* Group row */}
               <div className="flex" style={{ height: HEADER_HEIGHT / 2 }}>
-                {monthHeaders.map((mh, i) => (
+                {groupHeaders.map((mh, i) => (
                   <div
                     key={i}
                     className="border-r border-border flex items-center px-2 text-xs font-semibold text-muted-foreground capitalize"
-                    style={{ width: mh.count * dayWidth }}
+                    style={{ width: mh.count * colWidth }}
                   >
                     {mh.label}
                   </div>
                 ))}
               </div>
-              {/* Day row */}
+              {/* Column row */}
               <div className="flex" style={{ height: HEADER_HEIGHT / 2 }}>
-                {days.map((d, i) => {
-                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                {columns.map((d, i) => {
+                  const isWeekend = scaleUnit === "day" && (d.getDay() === 0 || d.getDay() === 6);
                   return (
                     <div
                       key={i}
                       className={`border-r border-border flex items-center justify-center text-[10px] ${
                         isWeekend ? "text-destructive/60 bg-destructive/5" : "text-muted-foreground"
                       }`}
-                      style={{ width: dayWidth }}
+                      style={{ width: colWidth }}
                     >
-                      {dayWidth >= 30 ? format(d, "d") : (i % 2 === 0 ? format(d, "d") : "")}
+                      {getColLabel(d, i)}
                     </div>
                   );
                 })}
@@ -240,15 +319,15 @@ export default function BacklogView() {
             {/* Task rows with bars */}
             <div className="relative">
               {/* Grid lines */}
-              {days.map((d, i) => {
-                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+              {columns.map((d, i) => {
+                const isWeekend = scaleUnit === "day" && (d.getDay() === 0 || d.getDay() === 6);
                 return (
                   <div
                     key={i}
                     className={`absolute top-0 bottom-0 border-r ${
                       isWeekend ? "border-border bg-destructive/5" : "border-border/50"
                     }`}
-                    style={{ left: i * dayWidth, width: dayWidth, height: tasks.length * ROW_HEIGHT || 200 }}
+                    style={{ left: i * colWidth, width: colWidth, height: tasks.length * ROW_HEIGHT || 200 }}
                   />
                 );
               })}
@@ -258,31 +337,33 @@ export default function BacklogView() {
                 const x = getX(m.date);
                 if (x < 0 || x > totalWidth) return null;
                 const color = MILESTONE_COLORS[m.milestone_type] || "hsl(var(--accent))";
+                const label = MILESTONE_TYPES[m.milestone_type] || m.name;
                 return (
                   <div
                     key={m.id}
-                    className="absolute top-0 z-20 pointer-events-none"
-                    style={{ left: x + dayWidth / 2, height: tasks.length * ROW_HEIGHT || 200 }}
+                    className={`absolute top-0 z-20 ${isAdmin ? "cursor-pointer" : "pointer-events-none"}`}
+                    style={{ left: x + colWidth / 2, height: tasks.length * ROW_HEIGHT || 200 }}
+                    onClick={() => isAdmin && setEditingMilestone(m)}
                   >
                     <div className="w-px h-full" style={{ backgroundColor: color, opacity: 0.6 }} />
                     <div
                       className="absolute -top-0 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap"
                       style={{ backgroundColor: color, color: "white" }}
                     >
-                      {m.name}
+                      {label}
                     </div>
                   </div>
                 );
               })}
 
               {/* Task bars */}
-              {tasks.map((task, rowIdx) => (
+              {tasks.map((task) => (
                 <div
                   key={task.id}
                   className="relative border-b border-border"
                   style={{ height: ROW_HEIGHT }}
                 >
-              {task.stages.map((stage) => {
+                  {task.stages.map((stage) => {
                     const x = getX(stage.start_date);
                     const w = getWidth(stage.start_date, stage.end_date);
                     const color = STAGE_COLORS[stage.stage_name] || "hsl(var(--accent))";
@@ -329,6 +410,7 @@ export default function BacklogView() {
       {/* Dialogs */}
       <CreateTaskDialog open={createTaskOpen} onOpenChange={setCreateTaskOpen} />
       <CreateMilestoneDialog open={createMilestoneOpen} onOpenChange={setCreateMilestoneOpen} />
+      <EditMilestoneDialog milestone={editingMilestone} open={!!editingMilestone} onOpenChange={(v) => !v && setEditingMilestone(null)} />
       <TaskDetailDialog task={selectedTask} open={!!selectedTask} onOpenChange={(v) => !v && setSelectedTask(null)} />
     </div>
   );
