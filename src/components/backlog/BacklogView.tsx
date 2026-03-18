@@ -376,16 +376,34 @@ export default function BacklogView() {
             </div>
           </div>
           <div className="overflow-y-auto" style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
-            {tasks.map((task) => (
+            {tasks.map((task, taskIndex) => (
               <div
                 key={task.id}
-                className={`flex items-center px-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
+                className={`flex items-center px-2 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
                   task.status === "prom" ? "bg-muted" : ""
                 }`}
                 style={{ height: ROW_HEIGHT }}
-                onClick={() => setSelectedTaskId(task.id)}
               >
-                <div className="min-w-0 flex items-center gap-1.5">
+                {/* Move buttons */}
+                {isAdmin && (
+                  <div className="flex flex-col shrink-0 mr-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); moveTask(taskIndex, "up"); }}
+                      disabled={taskIndex === 0}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); moveTask(taskIndex, "down"); }}
+                      disabled={taskIndex === tasks.length - 1}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <div className="min-w-0 flex items-center gap-1.5 flex-1" onClick={() => setSelectedTaskId(task.id)}>
                   {task.status === "backlog" && <Archive className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
                   <div>
                     <div className="text-sm font-medium truncate text-foreground">{task.title}</div>
