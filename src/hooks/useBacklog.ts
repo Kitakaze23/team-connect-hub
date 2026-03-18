@@ -24,6 +24,7 @@ export interface BacklogStage {
   start_date: string;
   end_date: string;
   sort_order: number;
+  responsible_user_id: string | null;
 }
 
 export interface BacklogDependency {
