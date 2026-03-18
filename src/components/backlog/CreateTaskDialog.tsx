@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2 } from "lucide-react";
 import { STAGE_NAMES, STAGE_LABELS, useCreateTask } from "@/hooks/useBacklog";
 import { format, addDays } from "date-fns";
@@ -24,7 +25,7 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
   const [taskType, setTaskType] = useState("web");
   const [hasDeps, setHasDeps] = useState(false);
   const [stages, setStages] = useState(
-    STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek() }))
+    STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek(), enabled: true }))
   );
   const [deps, setDeps] = useState<{ name: string; description: string; release_date: string; status: string }[]>([]);
 
@@ -40,12 +41,13 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
 
   const handleSubmit = () => {
     if (!title.trim()) return;
+    const enabledStages = stages.filter(s => s.enabled).map(({ enabled, ...rest }) => rest);
     createTask.mutate(
       {
         title: title.trim(),
         task_type: taskType,
         has_dependencies: hasDeps,
-        stages,
+        stages: enabledStages,
         dependencies: hasDeps ? deps : [],
       },
       {
@@ -54,7 +56,7 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
           setTitle("");
           setTaskType("web");
           setHasDeps(false);
-          setStages(STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek() })));
+          setStages(STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek(), enabled: true })));
           setDeps([]);
         },
       }
@@ -90,19 +92,29 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
             <Label className="font-semibold">Этапы</Label>
             <div className="space-y-2 mt-2">
               {stages.map((stage, idx) => (
-                <div key={stage.stage_name} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                  <span className="text-sm text-muted-foreground">{STAGE_LABELS[stage.stage_name]}</span>
+                <div key={stage.stage_name} className="grid grid-cols-[auto_1fr_auto_auto] gap-2 items-center">
+                  <Checkbox
+                    checked={stage.enabled}
+                    onCheckedChange={(checked) =>
+                      setStages((prev) => prev.map((s, i) => (i === idx ? { ...s, enabled: !!checked } : s)))
+                    }
+                  />
+                  <span className={`text-sm ${stage.enabled ? "text-muted-foreground" : "text-muted-foreground/40 line-through"}`}>
+                    {STAGE_LABELS[stage.stage_name]}
+                  </span>
                   <Input
                     type="date"
                     value={stage.start_date}
                     onChange={(e) => updateStage(idx, "start_date", e.target.value)}
                     className="w-36"
+                    disabled={!stage.enabled}
                   />
                   <Input
                     type="date"
                     value={stage.end_date}
                     onChange={(e) => updateStage(idx, "end_date", e.target.value)}
                     className="w-36"
+                    disabled={!stage.enabled}
                   />
                 </div>
               ))}
