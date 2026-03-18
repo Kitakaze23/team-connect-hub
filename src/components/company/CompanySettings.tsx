@@ -49,6 +49,8 @@ const CompanySettings = () => {
     if (company) {
       setCompanyName(company.name);
       setInviteCode(company.invite_code || "");
+      setSprintLengthDays(company.sprint_length_days || 14);
+      setSprintStartDate(company.sprint_start_date || "");
     }
 
     // Fetch members
