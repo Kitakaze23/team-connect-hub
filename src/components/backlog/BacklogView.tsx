@@ -215,7 +215,7 @@ export default function BacklogView() {
     }
 
     // Extend range to cover all tasks and milestones
-    tasks.forEach((t) => {
+    visibleTasks.forEach((t) => {
       t.stages.forEach((s) => {
         const sd = parseISO(s.start_date);
         const ed = parseISO(s.end_date);
