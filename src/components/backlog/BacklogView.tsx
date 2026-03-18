@@ -20,6 +20,7 @@ import { ru } from "date-fns/locale";
 type Period = "week" | "month" | "quarter" | "custom";
 
 const STATUS_LABELS: Record<string, string> = {
+  backlog: "Бэклог",
   development: "Разработка",
   prom: "ПРОМ",
   cancelled: "Отменена",
