@@ -102,6 +102,17 @@ const CompanySettings = () => {
     setSaving(false);
   };
 
+  const handleSaveSprint = async () => {
+    if (!companyId) return;
+    setSaving(true);
+    const updates: any = { sprint_length_days: sprintLengthDays };
+    if (sprintStartDate) updates.sprint_start_date = sprintStartDate;
+    const { error } = await supabase.from("companies").update(updates).eq("id", companyId);
+    if (error) toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    else toast({ title: "Настройки спринта сохранены" });
+    setSaving(false);
+  };
+
   const handleCopyCode = () => {
     navigator.clipboard.writeText(inviteCode);
     setCopied(true);
