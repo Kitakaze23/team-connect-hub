@@ -490,19 +490,19 @@ export default function BacklogView() {
                     return (
                       <div
                         key={stage.id}
-                        className={`absolute top-2 rounded cursor-pointer hover:opacity-80 transition-opacity group ${isProm ? "grayscale" : ""}`}
+                        className={`absolute top-2 rounded cursor-pointer hover:opacity-80 transition-opacity group`}
                         style={{
                           left: x,
                           width: w,
                           height: ROW_HEIGHT - 16,
-                          backgroundColor: isProm ? "hsl(var(--muted))" : color,
-                          opacity: isProm ? 0.5 : 0.85,
+                          backgroundColor: color,
+                          opacity: isProm ? 0.35 : 0.85,
                         }}
                         onClick={() => setSelectedTaskId(task.id)}
                         title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
                       >
                         {w > 60 && (
-                          <span className={`text-[9px] font-medium px-1.5 truncate block leading-[32px] ${isProm ? "text-muted-foreground" : "text-white"}`}>
+                          <span className={`text-[9px] font-medium px-1.5 truncate block leading-[32px] text-white`}>
                             {STAGE_LABELS[stage.stage_name]}
                           </span>
                         )}
