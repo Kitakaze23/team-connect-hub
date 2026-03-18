@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, MessageSquare, UserCircle, Terminal, Settings, LayoutList } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
