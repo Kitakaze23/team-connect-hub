@@ -55,7 +55,7 @@ const Dashboard = () => {
             {tabConfig.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleSetTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeTab === tab.id
                     ? "bg-card text-foreground shadow-sm"
