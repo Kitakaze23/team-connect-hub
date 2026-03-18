@@ -423,7 +423,7 @@ export default function BacklogView() {
                           backgroundColor: isProm ? "hsl(var(--muted))" : color,
                           opacity: isProm ? 0.5 : 0.85,
                         }}
-                        onClick={() => setSelectedTask(task)}
+                        onClick={() => setSelectedTaskId(task.id)}
                         title={`${STAGE_LABELS[stage.stage_name]}: ${stage.start_date} — ${stage.end_date}`}
                       >
                         {w > 60 && (
