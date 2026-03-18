@@ -536,7 +536,7 @@ export default function BacklogView() {
                   <div
                     key={m.id}
                     className={`absolute top-0 z-20 ${isAdmin ? "cursor-pointer" : "pointer-events-none"}`}
-                    style={{ left: x + colWidth / 2, height: visibleTasks.length * ROW_HEIGHT || 200 }}
+                    style={{ left: x + colWidth / 2, height: totalGridHeight }}
                     onClick={() => isAdmin && setEditingMilestone(m)}
                   >
                     <div className="w-px h-full" style={{ backgroundColor: color, opacity: 0.6 }} />
