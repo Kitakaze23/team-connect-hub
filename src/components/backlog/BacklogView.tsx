@@ -439,9 +439,9 @@ export default function BacklogView() {
                 </div>
               </div>
             ))}
-            {tasks.length === 0 && (
+            {visibleTasks.length === 0 && (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                Нет задач
+                {showArchive ? "Нет архивных задач" : "Нет задач"}
               </div>
             )}
           </div>
