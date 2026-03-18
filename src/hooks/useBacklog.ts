@@ -238,7 +238,7 @@ export function useUpdateTask() {
         await supabase.from("backlog_task_stages").delete().eq("task_id", id);
         if (stages.length) {
           const { error } = await supabase.from("backlog_task_stages").insert(
-            stages.map((s, i) => ({ task_id: id, stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, sort_order: i }))
+            stages.map((s, i) => ({ task_id: id, stage_name: s.stage_name, start_date: s.start_date, end_date: s.end_date, sort_order: i, responsible_user_id: s.responsible_user_id || null }))
           );
           if (error) throw error;
         }
