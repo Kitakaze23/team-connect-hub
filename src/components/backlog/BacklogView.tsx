@@ -411,7 +411,7 @@ export default function BacklogView() {
             {visibleTasks.map((task, taskIndex) => (
               <React.Fragment key={task.id}>
                 {taskIndex > 0 && (
-                  <div className="h-[3px] bg-foreground/15 shrink-0" />
+                  <div className="bg-foreground/15 shrink-0" style={{ height: SEPARATOR_HEIGHT }} />
                 )}
                 <div
                   className={`flex items-center px-2 cursor-pointer hover:bg-secondary/50 transition-colors ${
