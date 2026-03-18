@@ -140,6 +140,15 @@ export default function BacklogView() {
   const companyId = membership?.company_id;
   const { data: tasks = [], isLoading: tasksLoading } = useBacklogTasks();
   const { data: milestones = [], isLoading: milestonesLoading } = useBacklogMilestones();
+  const reorderTasks = useReorderTasks();
+
+  const moveTask = useCallback((index: number, direction: "up" | "down") => {
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= tasks.length) return;
+    const ids = tasks.map(t => t.id);
+    [ids[index], ids[newIndex]] = [ids[newIndex], ids[index]];
+    reorderTasks.mutate(ids);
+  }, [tasks, reorderTasks]);
 
   const { data: sprintSettings } = useQuery({
     queryKey: ["sprint-settings", companyId],
