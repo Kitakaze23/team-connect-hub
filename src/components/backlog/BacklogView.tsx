@@ -136,8 +136,32 @@ function getScaleUnit(period: Period): ScaleUnit {
 export default function BacklogView() {
   const { membership } = useAuth();
   const isAdmin = membership?.role === "admin";
+  const companyId = membership?.company_id;
   const { data: tasks = [], isLoading: tasksLoading } = useBacklogTasks();
   const { data: milestones = [], isLoading: milestonesLoading } = useBacklogMilestones();
+
+  const { data: sprintSettings } = useQuery({
+    queryKey: ["sprint-settings", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("sprint_length_days, sprint_start_date")
+        .eq("id", companyId!)
+        .single();
+      if (error) throw error;
+      return data as { sprint_length_days: number; sprint_start_date: string | null };
+    },
+  });
+
+  const currentSprintNumber = useMemo(() => {
+    if (!sprintSettings?.sprint_start_date || !sprintSettings?.sprint_length_days) return null;
+    const start = parseISO(sprintSettings.sprint_start_date);
+    const now = new Date();
+    const daysDiff = differenceInDays(now, start);
+    if (daysDiff < 0) return null;
+    return Math.floor(daysDiff / sprintSettings.sprint_length_days) + 1;
+  }, [sprintSettings]);
 
   const [period, setPeriod] = useState<Period>("month");
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
