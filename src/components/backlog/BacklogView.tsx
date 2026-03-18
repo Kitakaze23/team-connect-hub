@@ -364,6 +364,16 @@ export default function BacklogView() {
           </SelectContent>
         </Select>
         <BacklogStats tasks={tasks} />
+        <Button
+          size="sm"
+          variant={showArchive ? "default" : "outline"}
+          onClick={() => setShowArchive(!showArchive)}
+        >
+          <Archive className="w-4 h-4 mr-1" /> Архив
+          {tasks.filter(t => t.status === "archived").length > 0 && (
+            <span className="ml-1 text-xs">({tasks.filter(t => t.status === "archived").length})</span>
+          )}
+        </Button>
         {isAdmin && (
           <>
             <Button size="sm" variant="outline" onClick={() => setCreateMilestoneOpen(true)}>
