@@ -1,12 +1,13 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Flag, Loader2, Archive, BarChart3 } from "lucide-react";
+import { Plus, Flag, Loader2, Archive, BarChart3, ChevronUp, ChevronDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useBacklogTasks,
   useBacklogMilestones,
+  useReorderTasks,
   BacklogTask,
   BacklogMilestone,
   STAGE_LABELS,
