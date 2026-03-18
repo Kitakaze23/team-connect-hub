@@ -455,7 +455,7 @@ export default function BacklogView() {
       <CreateTaskDialog open={createTaskOpen} onOpenChange={setCreateTaskOpen} />
       <CreateMilestoneDialog open={createMilestoneOpen} onOpenChange={setCreateMilestoneOpen} />
       <EditMilestoneDialog milestone={editingMilestone} open={!!editingMilestone} onOpenChange={(v) => !v && setEditingMilestone(null)} />
-      <TaskDetailDialog task={selectedTask} open={!!selectedTask} onOpenChange={(v) => !v && setSelectedTask(null)} />
+      <TaskDetailDialog task={selectedTask} open={!!selectedTask} onOpenChange={(v) => !v && setSelectedTaskId(null)} />
     </div>
   );
 }
