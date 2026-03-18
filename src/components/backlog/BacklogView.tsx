@@ -96,7 +96,8 @@ export default function BacklogView() {
   const [period, setPeriod] = useState<Period>("month");
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [createMilestoneOpen, setCreateMilestoneOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<BacklogTask | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId) || null, [tasks, selectedTaskId]);
   const [editingMilestone, setEditingMilestone] = useState<BacklogMilestone | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
