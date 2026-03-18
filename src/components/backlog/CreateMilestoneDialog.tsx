@@ -21,7 +21,7 @@ const MILESTONE_TYPES: Record<string, string> = {
   release_mobile: "Релиз Mobile",
 };
 
-export const MILESTONE_COLORS: Record<string, string> = {
+const MILESTONE_COLORS: Record<string, string> = {
   alpha: "hsl(260, 50%, 55%)",
   demo: "hsl(210, 70%, 55%)",
   code_freeze: "hsl(0, 72%, 55%)",
@@ -30,20 +30,17 @@ export const MILESTONE_COLORS: Record<string, string> = {
   release_mobile: "hsl(174, 60%, 42%)",
 };
 
-export { MILESTONE_TYPES };
+export { MILESTONE_TYPES, MILESTONE_COLORS };
 
 export default function CreateMilestoneDialog({ open, onOpenChange }: Props) {
   const create = useCreateMilestone();
-  const [name, setName] = useState("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [type, setType] = useState("release_web");
 
   const handleSubmit = () => {
-    if (!name.trim()) return;
-    create.mutate({ name: name.trim(), date, milestone_type: type }, {
+    create.mutate({ name: MILESTONE_TYPES[type] || type, date, milestone_type: type }, {
       onSuccess: () => {
         onOpenChange(false);
-        setName("");
         setDate(format(new Date(), "yyyy-MM-dd"));
         setType("release_web");
       },
@@ -58,14 +55,6 @@ export default function CreateMilestoneDialog({ open, onOpenChange }: Props) {
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Название</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Название отсечки" />
-          </div>
-          <div>
-            <Label>Дата</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div>
             <Label>Тип</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -76,10 +65,14 @@ export default function CreateMilestoneDialog({ open, onOpenChange }: Props) {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label>Дата</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
         </div>
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
-          <Button onClick={handleSubmit} disabled={create.isPending || !name.trim()}>Создать</Button>
+          <Button onClick={handleSubmit} disabled={create.isPending}>Создать</Button>
         </div>
       </DialogContent>
     </Dialog>

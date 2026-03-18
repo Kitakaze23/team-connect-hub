@@ -55,6 +55,9 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
+  const [editingDepId, setEditingDepId] = useState<string | null>(null);
+  const [editDepReleaseDate, setEditDepReleaseDate] = useState("");
+  const [editDepDescription, setEditDepDescription] = useState("");
 
   if (!task) return null;
 
@@ -78,6 +81,16 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
     setNewLinkUrl("");
     setNewLinkLabel("");
     setNewLinkStageId(null);
+  };
+
+  const handleSaveDep = (depId: string) => {
+    const newDeps = task.dependencies.map(d =>
+      d.id === depId
+        ? { name: d.name, description: editDepDescription, release_date: editDepReleaseDate || null, status: d.status }
+        : { name: d.name, description: d.description, release_date: d.release_date, status: d.status }
+    );
+    updateTask.mutate({ id: task.id, dependencies: newDeps });
+    setEditingDepId(null);
   };
 
   const taskTypeLabel = task.task_type === "web" ? "WEB" : task.task_type === "mobile" ? "Mobile" : "Техническая";
@@ -205,22 +218,56 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
             <div>
               <Label className="font-semibold text-base">Смежники</Label>
               <div className="space-y-2 mt-2">
-                {task.dependencies.map((dep) => (
-                  <div key={dep.id} className="border border-border rounded-lg p-3">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-sm">{dep.name}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {dep.status === "done" ? "Готово" : dep.status === "in_progress" ? "В работе" : "Ожидание"}
-                      </Badge>
+                {task.dependencies.map((dep) => {
+                  const isEditingDep = editingDepId === dep.id;
+                  return (
+                    <div key={dep.id} className="border border-border rounded-lg p-3">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-sm">{dep.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {dep.status === "done" ? "Готово" : dep.status === "in_progress" ? "В работе" : "Ожидание"}
+                        </Badge>
+                      </div>
+                      {isEditingDep ? (
+                        <div className="mt-2 space-y-2">
+                          <div>
+                            <Label className="text-xs">Описание</Label>
+                            <Textarea className="text-xs h-16" value={editDepDescription} onChange={(e) => setEditDepDescription(e.target.value)} />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Дата релиза</Label>
+                            <Input type="date" className="h-7 text-xs w-40" value={editDepReleaseDate} onChange={(e) => setEditDepReleaseDate(e.target.value)} />
+                          </div>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => handleSaveDep(dep.id)}>✓ Сохранить</Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingDepId(null)}><X className="w-3 h-3" /></Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {dep.description && <p className="text-xs text-muted-foreground mt-1">{dep.description}</p>}
+                          {dep.release_date && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Релиз: {format(new Date(dep.release_date), "dd.MM.yyyy")}
+                            </p>
+                          )}
+                          {isAdmin && (
+                            <button
+                              className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-1"
+                              onClick={() => {
+                                setEditingDepId(dep.id);
+                                setEditDepDescription(dep.description || "");
+                                setEditDepReleaseDate(dep.release_date || "");
+                              }}
+                            >
+                              <Pencil className="w-3 h-3" /> Редактировать
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
-                    {dep.description && <p className="text-xs text-muted-foreground mt-1">{dep.description}</p>}
-                    {dep.release_date && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Релиз: {format(new Date(dep.release_date), "dd.MM.yyyy")}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </>

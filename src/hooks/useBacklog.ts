@@ -103,7 +103,6 @@ export function useBacklogTasks() {
 
       if (error) throw error;
 
-      // Fetch stages and dependencies for all tasks
       const taskIds = tasks.map((t: any) => t.id);
       
       const [stagesRes, depsRes] = await Promise.all([
@@ -177,7 +176,6 @@ export function useCreateTask() {
 
       if (error) throw error;
 
-      // Insert stages
       if (payload.stages.length) {
         const { error: stErr } = await supabase.from("backlog_task_stages").insert(
           payload.stages.map((s, i) => ({
@@ -191,7 +189,6 @@ export function useCreateTask() {
         if (stErr) throw stErr;
       }
 
-      // Insert dependencies
       if (payload.dependencies.length) {
         const { error: depErr } = await supabase.from("backlog_task_dependencies").insert(
           payload.dependencies.map((d) => ({
@@ -291,6 +288,21 @@ export function useCreateMilestone() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["backlog-milestones"] });
       toast({ title: "Отсечка добавлена" });
+    },
+  });
+}
+
+export function useUpdateMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { id: string; date?: string; milestone_type?: string; name?: string }) => {
+      const { id, ...fields } = payload;
+      const { error } = await supabase.from("backlog_milestones").update(fields).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["backlog-milestones"] });
+      toast({ title: "Отсечка обновлена" });
     },
   });
 }
