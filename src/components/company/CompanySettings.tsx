@@ -272,6 +272,35 @@ const CompanySettings = () => {
           ))}
         </motion.div>
 
+        {/* Sprint settings */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
+            <Timer className="w-4 h-4" /> Настройки спринта
+          </h3>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Размер спринта (дни)</Label>
+            <Input
+              type="number"
+              min={1}
+              value={sprintLengthDays}
+              onChange={(e) => setSprintLengthDays(Number(e.target.value) || 14)}
+              className="h-9 bg-secondary/50 w-32"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Дата начала первого спринта</Label>
+            <Input
+              type="date"
+              value={sprintStartDate}
+              onChange={(e) => setSprintStartDate(e.target.value)}
+              className="h-9 bg-secondary/50 w-48"
+            />
+          </div>
+          <Button size="sm" onClick={handleSaveSprint} disabled={saving} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Сохранить"}
+          </Button>
+        </motion.div>
+
         {/* Team management */}
         <TeamManagement />
 
