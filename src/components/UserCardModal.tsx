@@ -6,11 +6,12 @@ import { useCall } from "@/contexts/CallContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
-const statusIcons = {
+const statusIcons: Record<string, typeof Building2> = {
   office: Building2,
   remote: Wifi,
   vacation: Palmtree,
   sick: Stethoscope,
+  day_off: Coffee,
 };
 
 const dayNames: Record<string, string> = {
