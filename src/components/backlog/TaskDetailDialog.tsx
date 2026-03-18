@@ -30,6 +30,7 @@ interface Props {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  backlog: "Бэклог",
   development: "Разработка",
   prom: "ПРОМ",
   cancelled: "Отменена",
