@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Send, Trash2, X, Check } from "lucide-react";
 import {
   BacklogTask,
   STAGE_LABELS,
@@ -58,6 +58,8 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const [editingDepId, setEditingDepId] = useState<string | null>(null);
   const [editDepReleaseDate, setEditDepReleaseDate] = useState("");
   const [editDepDescription, setEditDepDescription] = useState("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState("");
 
   if (!task) return null;
 
@@ -93,6 +95,13 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
     setEditingDepId(null);
   };
 
+  const handleSaveTitle = () => {
+    if (titleValue.trim() && titleValue.trim() !== task.title) {
+      updateTask.mutate({ id: task.id, title: titleValue.trim() });
+    }
+    setEditingTitle(false);
+  };
+
   const taskTypeLabel = task.task_type === "web" ? "WEB" : task.task_type === "mobile" ? "Mobile" : "Техническая";
 
   return (
@@ -100,7 +109,28 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {task.title}
+            {isAdmin && editingTitle ? (
+              <div className="flex items-center gap-1 flex-1">
+                <Input
+                  className="h-8 text-lg font-semibold"
+                  value={titleValue}
+                  onChange={(e) => setTitleValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveTitle()}
+                  autoFocus
+                />
+                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={handleSaveTitle}><Check className="w-4 h-4" /></Button>
+                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingTitle(false)}><X className="w-4 h-4" /></Button>
+              </div>
+            ) : (
+              <>
+                {task.title}
+                {isAdmin && (
+                  <button className="text-muted-foreground hover:text-foreground" onClick={() => { setEditingTitle(true); setTitleValue(task.title); }}>
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
+              </>
+            )}
             <Badge variant="outline" className="ml-2">{taskTypeLabel}</Badge>
           </DialogTitle>
         </DialogHeader>
