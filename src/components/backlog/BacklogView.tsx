@@ -370,7 +370,7 @@ export default function BacklogView() {
               <div
                 key={task.id}
                 className={`flex items-center px-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors ${
-                  task.status === "prom" ? "opacity-50 bg-muted" : ""
+                  task.status === "prom" ? "bg-muted" : ""
                 }`}
                 style={{ height: ROW_HEIGHT }}
                 onClick={() => setSelectedTaskId(task.id)}
