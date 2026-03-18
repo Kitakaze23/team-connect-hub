@@ -543,7 +543,7 @@ export default function BacklogView() {
               })}
 
               {/* Task bars */}
-              {tasks.map((task) => {
+              {visibleTasks.map((task) => {
                 // Detect overlapping stages and assign rows
                 const stageRows = task.stages.map((stage, idx) => {
                   let row = 0;
