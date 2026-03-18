@@ -99,6 +99,7 @@ export function useBacklogTasks() {
         .from("backlog_tasks")
         .select("*")
         .eq("company_id", companyId!)
+        .order("sort_order")
         .order("created_at");
 
       if (error) throw error;
