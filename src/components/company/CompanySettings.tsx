@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2, Timer } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import TeamManagement from "./TeamManagement";
 import DeskManagement from "./DeskManagement";
 import { Button } from "@/components/ui/button";
