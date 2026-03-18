@@ -29,6 +29,8 @@ const CompanySettings = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingMembers, setPendingMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sprintLengthDays, setSprintLengthDays] = useState(14);
+  const [sprintStartDate, setSprintStartDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   const companyId = membership?.company_id;
