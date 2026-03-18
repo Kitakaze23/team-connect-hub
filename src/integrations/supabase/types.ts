@@ -186,6 +186,7 @@ export type Database = {
           created_at: string
           end_date: string
           id: string
+          responsible_user_id: string | null
           sort_order: number
           stage_name: string
           start_date: string
@@ -195,6 +196,7 @@ export type Database = {
           created_at?: string
           end_date: string
           id?: string
+          responsible_user_id?: string | null
           sort_order?: number
           stage_name: string
           start_date: string
@@ -204,6 +206,7 @@ export type Database = {
           created_at?: string
           end_date?: string
           id?: string
+          responsible_user_id?: string | null
           sort_order?: number
           stage_name?: string
           start_date?: string

@@ -1,0 +1,1 @@
+ALTER TABLE public.backlog_task_stages ADD COLUMN responsible_user_id uuid DEFAULT NULL;
