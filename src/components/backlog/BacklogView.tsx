@@ -268,6 +268,14 @@ export default function BacklogView() {
     }
   };
 
+  // Scroll to today on load / period change
+  useEffect(() => {
+    if (!scrollRef.current || columns.length === 0) return;
+    const todayX = getX(format(new Date(), "yyyy-MM-dd"));
+    const containerWidth = scrollRef.current.clientWidth;
+    scrollRef.current.scrollLeft = Math.max(0, todayX - containerWidth / 3);
+  }, [columns, colWidth, period]);
+
   const getWidth = (startDate: string, endDate: string) => {
     const x1 = getX(startDate);
     const x2 = getX(endDate);
