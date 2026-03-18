@@ -25,7 +25,7 @@ export default function CreateTaskDialog({ open, onOpenChange }: Props) {
   const [taskType, setTaskType] = useState("web");
   const [hasDeps, setHasDeps] = useState(false);
   const [stages, setStages] = useState(
-    STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek() }))
+    STAGE_NAMES.map((name) => ({ stage_name: name, start_date: today(), end_date: nextWeek(), enabled: true }))
   );
   const [deps, setDeps] = useState<{ name: string; description: string; release_date: string; status: string }[]>([]);
 
