@@ -52,6 +52,9 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const [newLinkStageId, setNewLinkStageId] = useState<string | null>(null);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
 
   if (!task) return null;
 
