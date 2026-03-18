@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -267,6 +267,14 @@ export default function BacklogView() {
       return (diffDays / totalDays) * totalWidth;
     }
   };
+
+  // Scroll to today on load / period change
+  useEffect(() => {
+    if (!scrollRef.current || columns.length === 0) return;
+    const todayX = getX(format(new Date(), "yyyy-MM-dd"));
+    const containerWidth = scrollRef.current.clientWidth;
+    scrollRef.current.scrollLeft = Math.max(0, todayX - containerWidth / 3);
+  }, [columns, colWidth, period]);
 
   const getWidth = (startDate: string, endDate: string) => {
     const x1 = getX(startDate);
