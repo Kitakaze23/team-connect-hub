@@ -28,10 +28,24 @@ const ContactsTab = () => {
   useEffect(() => {
     if (!membership) return;
     const fetchContacts = async () => {
+      // First get approved company members, then fetch their profiles
+      const { data: members } = await supabase
+        .from("company_members")
+        .select("user_id")
+        .eq("company_id", membership.company_id)
+        .eq("status", "approved");
+
+      const memberUserIds = (members || []).map(m => m.user_id);
+      if (memberUserIds.length === 0) {
+        setContacts([]);
+        setLoading(false);
+        return;
+      }
+
       const { data } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name, position, team, phone, messenger, city, avatar_url")
-        .eq("company_id", membership.company_id);
+        .in("user_id", memberUserIds);
       setContacts(data || []);
       setLoading(false);
     };
