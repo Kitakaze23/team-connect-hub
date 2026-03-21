@@ -219,8 +219,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).select("id").single();
     if (log) setCallLogId(log.id);
 
-    // Setup signaling channel
-    const channel = setupSignalingChannel(convId);
+    // Setup signaling channel and wait for subscription
+    const channel = await setupSignalingChannel(convId);
 
     // Get user profile for caller info
     const { data: profile } = await supabase
