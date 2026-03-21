@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Users, MessageSquare, UserCircle, Terminal, Settings, LayoutList } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import TeamView from "@/components/team/TeamView";
 import ChatView from "@/components/chat/ChatView";
 import ProfileView from "@/components/profile/ProfileView";
@@ -25,13 +26,21 @@ const Dashboard = () => {
   }, []);
   const isMobile = useIsMobile();
   const { membership } = useAuth();
+  const [backlogEnabled, setBacklogEnabled] = useState(true);
 
   const isAdmin = membership?.role === "admin";
+
+  useEffect(() => {
+    if (!membership?.company_id) return;
+    supabase.from("companies").select("backlog_enabled").eq("id", membership.company_id).single().then(({ data }) => {
+      if (data) setBacklogEnabled(data.backlog_enabled);
+    });
+  }, [membership?.company_id]);
 
   const tabConfig = [
     { id: "team" as Tab, label: "Команда", icon: Users },
     { id: "chat" as Tab, label: "Чат", icon: MessageSquare },
-    { id: "backlog" as Tab, label: "Бэклог", icon: LayoutList },
+    ...(backlogEnabled ? [{ id: "backlog" as Tab, label: "Бэклог", icon: LayoutList }] : []),
     { id: "profile" as Tab, label: "Профиль", icon: UserCircle },
     ...(isAdmin ? [{ id: "settings" as Tab, label: "Настройки", icon: Settings }] : []),
   ];

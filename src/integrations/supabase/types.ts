@@ -322,6 +322,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          backlog_enabled: boolean
           created_at: string
           desk_sharing_enabled: boolean
           floor_plan_url: string | null
@@ -335,6 +336,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          backlog_enabled?: boolean
           created_at?: string
           desk_sharing_enabled?: boolean
           floor_plan_url?: string | null
@@ -348,6 +350,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          backlog_enabled?: boolean
           created_at?: string
           desk_sharing_enabled?: boolean
           floor_plan_url?: string | null
@@ -545,6 +548,8 @@ export type Database = {
         Row: {
           conversation_id: string
           created_at: string
+          file_type: string | null
+          file_url: string | null
           id: string
           pinned: boolean | null
           text: string
@@ -553,6 +558,8 @@ export type Database = {
         Insert: {
           conversation_id: string
           created_at?: string
+          file_type?: string | null
+          file_url?: string | null
           id?: string
           pinned?: boolean | null
           text: string
@@ -561,6 +568,8 @@ export type Database = {
         Update: {
           conversation_id?: string
           created_at?: string
+          file_type?: string | null
+          file_url?: string | null
           id?: string
           pinned?: boolean | null
           text?: string

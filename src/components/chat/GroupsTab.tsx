@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Send, Plus, ArrowLeft, Loader2, Pin, Users, Check, Settings } from "lucide-react";
+import { Plus, ArrowLeft, Loader2, Users, Check, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,6 +11,8 @@ import GroupSettingsDialog from "./GroupSettingsDialog";
 import CallButtons from "@/components/call/CallButtons";
 import { useUserCard } from "@/hooks/useUserCard";
 import UserCardModal from "@/components/UserCardModal";
+import ChatMessageBubble from "./ChatMessageBubble";
+import ChatMessageInput from "./ChatMessageInput";
 
 interface GroupConversation {
   id: string;
@@ -24,6 +26,8 @@ interface Message {
   user_id: string;
   pinned: boolean;
   created_at: string;
+  file_url?: string | null;
+  file_type?: string | null;
   profile?: { first_name: string; last_name: string; avatar_url: string | null };
 }
 
@@ -39,11 +43,9 @@ const GroupsTab = () => {
   const [groups, setGroups] = useState<GroupConversation[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupConversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const { cardUser, openCard, closeCard } = useUserCard();
 
-  // Create group state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -57,7 +59,6 @@ const GroupsTab = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load groups
   useEffect(() => {
     if (!membership || !user) return;
     const fetchGroups = async () => {
@@ -69,7 +70,6 @@ const GroupsTab = () => {
 
       if (!convs || convs.length === 0) { setLoading(false); return; }
 
-      // Filter to only groups I'm a member of
       const convIds = convs.map(c => c.id);
       const { data: members } = await supabase
         .from("conversation_members")
@@ -90,13 +90,12 @@ const GroupsTab = () => {
     fetchGroups();
   }, [membership, user]);
 
-  // Load messages when group is selected
   useEffect(() => {
     if (!activeGroup) return;
     const fetchMessages = async () => {
       const { data } = await supabase
         .from("messages")
-        .select("id, text, user_id, pinned, created_at")
+        .select("id, text, user_id, pinned, created_at, file_url, file_type")
         .eq("conversation_id", activeGroup.id)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -132,14 +131,6 @@ const GroupsTab = () => {
 
     return () => { supabase.removeChannel(channel); };
   }, [activeGroup]);
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !activeGroup || !user) return;
-    const text = newMessage.trim();
-    setNewMessage("");
-    await supabase.from("messages").insert({ conversation_id: activeGroup.id, user_id: user.id, text });
-  };
 
   const loadContacts = async () => {
     if (!membership) return;
@@ -190,7 +181,6 @@ const GroupsTab = () => {
     return <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-accent" /></div>;
   }
 
-  // Group chat view
   if (activeGroup) {
     return (
       <>
@@ -205,11 +195,7 @@ const GroupsTab = () => {
             <span className="text-sm font-medium text-foreground">{activeGroup.name}</span>
             <span className="text-xs text-muted-foreground ml-2">{activeGroup.member_count} уч.</span>
           </div>
-          <CallButtons
-            conversationId={activeGroup.id}
-            targetUsers={[]}
-            isGroup
-          />
+          <CallButtons conversationId={activeGroup.id} targetUsers={[]} isGroup />
           <button onClick={() => setSettingsOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors">
             <Settings className="w-5 h-5" />
           </button>
@@ -229,56 +215,22 @@ const GroupsTab = () => {
           }}
         />
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-          {messages.map((msg) => {
-            const isOwn = msg.user_id === user?.id;
-            const initials = msg.profile ? `${msg.profile.first_name?.[0] || ""}${msg.profile.last_name?.[0] || ""}` : "?";
-            const displayName = msg.profile ? `${msg.profile.first_name} ${msg.profile.last_name?.[0]}.` : "Unknown";
-            return (
-              <motion.div key={msg.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}>
-                {msg.profile?.avatar_url ? (
-                  <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: msg.profile.avatar_url })} className="shrink-0">
-                    <img src={msg.profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all" />
-                  </button>
-                ) : (
-                  <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: null })} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-mono font-bold text-foreground shrink-0 cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all">
-                    {initials}
-                  </button>
-                )}
-                <div className={`max-w-[75%]`}>
-                  <div className={`flex items-center gap-2 mb-0.5 ${isOwn ? "justify-end" : ""}`}>
-                    <button onClick={() => msg.profile && openCard({ user_id: msg.user_id, first_name: msg.profile.first_name, last_name: msg.profile.last_name, avatar_url: msg.profile.avatar_url || null })} className="text-xs font-medium text-foreground hover:text-accent transition-colors cursor-pointer">{displayName}</button>
-                    <span className="text-[10px] text-muted-foreground">
-                      {new Date(msg.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                    {msg.pinned && <Pin className="w-3 h-3 text-accent" />}
-                  </div>
-                  <div className={`px-3 py-2 rounded-2xl text-sm ${
-                    isOwn ? "bg-primary text-primary-foreground rounded-tr-md" : "bg-card border border-border rounded-tl-md"
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+          {messages.map((msg) => (
+            <ChatMessageBubble
+              key={msg.id}
+              msg={msg}
+              isOwn={msg.user_id === user?.id}
+              onAvatarClick={openCard}
+            />
+          ))}
           <div ref={messagesEndRef} />
         </div>
-        <form onSubmit={handleSend} className="shrink-0 border-t border-border bg-card/80 backdrop-blur-md p-3">
-          <div className="flex gap-2 items-center">
-            <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Написать сообщение..."
-              className="flex-1 bg-secondary rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-accent/30 transition-all" />
-            <button type="submit" disabled={!newMessage.trim()}
-              className="w-10 h-10 rounded-xl bg-accent text-accent-foreground flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40">
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </form>
+        <ChatMessageInput conversationId={activeGroup.id} />
         {cardUser && <UserCardModal user={cardUser} onClose={closeCard} />}
       </>
     );
   }
-  // Groups list
+
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (open) { loadContacts(); setGroupName(""); setSelectedUsers(new Set()); setContactSearch(""); } }}>

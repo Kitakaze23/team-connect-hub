@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2, Timer } from "lucide-react";
+import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2, Timer, LayoutList } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import TeamManagement from "./TeamManagement";
 import DeskManagement from "./DeskManagement";
@@ -32,6 +32,7 @@ const CompanySettings = () => {
   const [loading, setLoading] = useState(true);
   const [sprintLengthDays, setSprintLengthDays] = useState(14);
   const [sprintStartDate, setSprintStartDate] = useState("");
+  const [backlogEnabled, setBacklogEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const companyId = membership?.company_id;
@@ -43,7 +44,7 @@ const CompanySettings = () => {
     // Fetch company
     const { data: company } = await supabase
       .from("companies")
-      .select("name, invite_code, sprint_length_days, sprint_start_date")
+      .select("name, invite_code, sprint_length_days, sprint_start_date, backlog_enabled")
       .eq("id", companyId)
       .single();
 
@@ -52,6 +53,7 @@ const CompanySettings = () => {
       setInviteCode(company.invite_code || "");
       setSprintLengthDays(company.sprint_length_days || 14);
       setSprintStartDate(company.sprint_start_date || "");
+      setBacklogEnabled(company.backlog_enabled !== false);
     }
 
     // Fetch members
@@ -286,6 +288,30 @@ const CompanySettings = () => {
               )}
             </div>
           ))}
+        </motion.div>
+
+        {/* Backlog toggle */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
+            <LayoutList className="w-4 h-4" /> Бэклог
+          </h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-foreground">Вкладка «Бэклог»</p>
+              <p className="text-xs text-muted-foreground">Показывать вкладку бэклога для всех участников</p>
+            </div>
+            <button
+              onClick={async () => {
+                const next = !backlogEnabled;
+                setBacklogEnabled(next);
+                await supabase.from("companies").update({ backlog_enabled: next }).eq("id", companyId);
+                toast({ title: next ? "Бэклог включён" : "Бэклог отключён" });
+              }}
+              className={`w-11 h-6 rounded-full transition-colors relative ${backlogEnabled ? "bg-accent" : "bg-secondary"}`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${backlogEnabled ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
         </motion.div>
 
         {/* Sprint settings */}
