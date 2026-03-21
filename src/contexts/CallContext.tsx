@@ -154,7 +154,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       config: { broadcast: { self: false } },
     });
 
-    incomingChannel.on("broadcast", { event: "incoming-call" }, ({ payload }) => {
+    incomingChannel.on("broadcast", { event: "incoming-call" }, async ({ payload }) => {
       if (callStateRef.current !== "idle") {
         // Already in a call, auto-reject
         const rejectChannel = supabase.channel(`call-${payload.conversationId}`, { config: { broadcast: { self: false } } });
