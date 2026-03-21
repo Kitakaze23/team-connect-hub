@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import CallButtons from "@/components/call/CallButtons";
+import ChatMessageBubble from "./ChatMessageBubble";
+import ChatMessageInput from "./ChatMessageInput";
 
 interface DirectConversation {
   id: string;
@@ -13,7 +15,6 @@ interface DirectConversation {
   other_first_name: string;
   other_last_name: string;
   other_avatar_url: string | null;
-  last_message?: string;
 }
 
 interface Message {
@@ -22,6 +23,8 @@ interface Message {
   user_id: string;
   pinned: boolean;
   created_at: string;
+  file_url?: string | null;
+  file_type?: string | null;
 }
 
 interface Contact {
@@ -36,7 +39,6 @@ const DirectTab = () => {
   const [conversations, setConversations] = useState<DirectConversation[]>([]);
   const [activeConv, setActiveConv] = useState<DirectConversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -47,7 +49,6 @@ const DirectTab = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load DM conversations
   useEffect(() => {
     if (!membership || !user) return;
     const fetchDMs = async () => {
@@ -67,7 +68,6 @@ const DirectTab = () => {
 
       if (!members) { setLoading(false); return; }
 
-      // Find DMs where I'm a member
       const myConvIds = new Set(members.filter(m => m.user_id === user.id).map(m => m.conversation_id));
       const otherMembers = members.filter(m => myConvIds.has(m.conversation_id) && m.user_id !== user.id);
 
@@ -96,13 +96,12 @@ const DirectTab = () => {
     fetchDMs();
   }, [membership, user]);
 
-  // Load messages when activeConv changes
   useEffect(() => {
     if (!activeConv) return;
     const fetchMessages = async () => {
       const { data } = await supabase
         .from("messages")
-        .select("id, text, user_id, pinned, created_at")
+        .select("id, text, user_id, pinned, created_at, file_url, file_type")
         .eq("conversation_id", activeConv.id)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -120,14 +119,6 @@ const DirectTab = () => {
     return () => { supabase.removeChannel(channel); };
   }, [activeConv]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !activeConv || !user) return;
-    const text = newMessage.trim();
-    setNewMessage("");
-    await supabase.from("messages").insert({ conversation_id: activeConv.id, user_id: user.id, text });
-  };
-
   const loadContacts = async () => {
     if (!membership) return;
     const { data } = await supabase
@@ -140,7 +131,6 @@ const DirectTab = () => {
 
   const startDM = async (contact: Contact) => {
     if (!user || !membership) return;
-    // Check if DM already exists
     const existing = conversations.find(c => c.other_user_id === contact.user_id);
     if (existing) {
       setActiveConv(existing);
@@ -148,7 +138,6 @@ const DirectTab = () => {
       return;
     }
 
-    // Create DM conversation
     const { data: conv } = await supabase
       .from("conversations")
       .insert({ company_id: membership.company_id, type: "direct", name: null, created_by: user.id })
@@ -183,7 +172,6 @@ const DirectTab = () => {
     return <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-accent" /></div>;
   }
 
-  // Chat view
   if (activeConv) {
     return (
       <>
@@ -211,44 +199,21 @@ const DirectTab = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-          {messages.map((msg) => {
-            const isOwn = msg.user_id === user?.id;
-            return (
-              <motion.div key={msg.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}>
-                <div className={`max-w-[75%]`}>
-                  <div className={`flex items-center gap-2 mb-0.5 ${isOwn ? "justify-end" : ""}`}>
-                    <span className="text-[10px] text-muted-foreground">
-                      {new Date(msg.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                    {msg.pinned && <Pin className="w-3 h-3 text-accent" />}
-                  </div>
-                  <div className={`px-3 py-2 rounded-2xl text-sm ${
-                    isOwn ? "bg-primary text-primary-foreground rounded-tr-md" : "bg-card border border-border rounded-tl-md"
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+          {messages.map((msg) => (
+            <ChatMessageBubble
+              key={msg.id}
+              msg={msg}
+              isOwn={msg.user_id === user?.id}
+              showAuthor={false}
+            />
+          ))}
           <div ref={messagesEndRef} />
         </div>
-        <form onSubmit={handleSend} className="shrink-0 border-t border-border bg-card/80 backdrop-blur-md p-3">
-          <div className="flex gap-2 items-center">
-            <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Написать сообщение..."
-              className="flex-1 bg-secondary rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-accent/30 transition-all" />
-            <button type="submit" disabled={!newMessage.trim()}
-              className="w-10 h-10 rounded-xl bg-accent text-accent-foreground flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40">
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </form>
+        <ChatMessageInput conversationId={activeConv.id} />
       </>
     );
   }
 
-  // Conversation list
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (open) loadContacts(); }}>
