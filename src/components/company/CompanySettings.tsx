@@ -32,6 +32,7 @@ const CompanySettings = () => {
   const [loading, setLoading] = useState(true);
   const [sprintLengthDays, setSprintLengthDays] = useState(14);
   const [sprintStartDate, setSprintStartDate] = useState("");
+  const [backlogEnabled, setBacklogEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const companyId = membership?.company_id;
