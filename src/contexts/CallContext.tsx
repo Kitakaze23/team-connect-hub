@@ -89,6 +89,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [webrtc]);
 
   const setupSignalingChannel = useCallback((convId: string) => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     const channel = supabase.channel(`call-${convId}`, {
       config: { broadcast: { self: false } },
     });
@@ -132,9 +136,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    channel.subscribe();
-    channelRef.current = channel;
-    return channel;
+    return new Promise<ReturnType<typeof supabase.channel>>((resolve) => {
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          channelRef.current = channel;
+          resolve(channel);
+        }
+      });
+    });
   }, [user, webrtc, cleanupCall]);
 
   // Listen for incoming calls
@@ -145,7 +154,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       config: { broadcast: { self: false } },
     });
 
-    incomingChannel.on("broadcast", { event: "incoming-call" }, ({ payload }) => {
+    incomingChannel.on("broadcast", { event: "incoming-call" }, async ({ payload }) => {
       if (callStateRef.current !== "idle") {
         // Already in a call, auto-reject
         const rejectChannel = supabase.channel(`call-${payload.conversationId}`, { config: { broadcast: { self: false } } });
@@ -169,7 +178,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setParticipants(payload.participants || []);
 
       // Setup signaling
-      setupSignalingChannel(payload.conversationId);
+      await setupSignalingChannel(payload.conversationId);
 
       // Auto-reject after 30s
       ringTimeoutRef.current = setTimeout(() => {
@@ -210,8 +219,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).select("id").single();
     if (log) setCallLogId(log.id);
 
-    // Setup signaling channel
-    const channel = setupSignalingChannel(convId);
+    // Setup signaling channel and wait for subscription
+    const channel = await setupSignalingChannel(convId);
 
     // Get user profile for caller info
     const { data: profile } = await supabase
