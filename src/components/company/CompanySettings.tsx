@@ -53,6 +53,7 @@ const CompanySettings = () => {
       setInviteCode(company.invite_code || "");
       setSprintLengthDays(company.sprint_length_days || 14);
       setSprintStartDate(company.sprint_start_date || "");
+      setBacklogEnabled(company.backlog_enabled !== false);
     }
 
     // Fetch members
