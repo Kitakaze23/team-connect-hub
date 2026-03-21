@@ -20,6 +20,7 @@ export interface Participant {
 export const useWebRTC = () => {
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
@@ -37,6 +38,20 @@ export const useWebRTC = () => {
       return stream;
     } catch (err: any) {
       throw new Error(err.name === "NotAllowedError" ? "no_permission" : "media_error");
+    }
+  }, []);
+
+  const flushPendingCandidates = useCallback(async (remoteUserId: string, pc: RTCPeerConnection) => {
+    const pending = pendingCandidatesRef.current.get(remoteUserId);
+    if (pending && pending.length > 0) {
+      for (const candidate of pending) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn("Error adding queued ICE candidate:", e);
+        }
+      }
+      pendingCandidatesRef.current.delete(remoteUserId);
     }
   }, []);
 
@@ -84,19 +99,37 @@ export const useWebRTC = () => {
   ) => {
     const pc = createPeerConnection(remoteUserId, onIceCandidate);
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    // Flush any candidates that arrived before the PC was ready
+    await flushPendingCandidates(remoteUserId, pc);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     return answer;
-  }, [createPeerConnection]);
+  }, [createPeerConnection, flushPendingCandidates]);
 
   const handleAnswer = useCallback(async (remoteUserId: string, answer: RTCSessionDescriptionInit) => {
     const pc = peerConnectionsRef.current.get(remoteUserId);
-    if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
-  }, []);
+    if (pc) {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      // Flush any candidates that arrived before the answer was set
+      await flushPendingCandidates(remoteUserId, pc);
+    }
+  }, [flushPendingCandidates]);
 
   const handleIceCandidate = useCallback(async (remoteUserId: string, candidate: RTCIceCandidateInit) => {
     const pc = peerConnectionsRef.current.get(remoteUserId);
-    if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    if (pc && pc.remoteDescription) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn("Error adding ICE candidate:", e);
+      }
+    } else {
+      // Queue the candidate for later
+      if (!pendingCandidatesRef.current.has(remoteUserId)) {
+        pendingCandidatesRef.current.set(remoteUserId, []);
+      }
+      pendingCandidatesRef.current.get(remoteUserId)!.push(candidate);
+    }
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -119,6 +152,7 @@ export const useWebRTC = () => {
     setLocalStream(null);
     peerConnectionsRef.current.forEach(pc => pc.close());
     peerConnectionsRef.current.clear();
+    pendingCandidatesRef.current.clear();
     setRemoteStreams(new Map());
     setIsMuted(false);
     setIsCameraOff(false);
