@@ -62,6 +62,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const ringTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const clearRingTimeout = useCallback(() => {
+    if (ringTimeoutRef.current) {
+      clearTimeout(ringTimeoutRef.current);
+      ringTimeoutRef.current = null;
+    }
+  }, []);
+
   // Timer for active call
   useEffect(() => {
     if (callState === "active") {
@@ -78,7 +85,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+    clearRingTimeout();
     webrtc.cleanup();
     setCallStateTracked("idle");
     setParticipants([]);
@@ -86,7 +93,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setConversationId(null);
     setCallDuration(0);
     setCallLogId(null);
-  }, [webrtc]);
+  }, [webrtc, clearRingTimeout]);
 
   const setupSignalingChannel = useCallback((convId: string) => {
     if (channelRef.current) {
@@ -113,6 +120,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
               type: "broadcast", event: "call-signal",
               payload: { type: "answer", sdp: answer, fromUserId: user.id, targetUserId: payload.fromUserId },
             });
+            clearRingTimeout();
             setCallStateTracked("active");
           } catch (e) {
             console.error("Error handling offer:", e);
@@ -120,6 +128,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         case "answer":
           await webrtc.handleAnswer(payload.fromUserId, payload.sdp);
+          clearRingTimeout();
           setCallStateTracked("active");
           break;
         case "ice-candidate":
@@ -144,7 +153,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
     });
-  }, [user, webrtc, cleanupCall]);
+  }, [user, webrtc, cleanupCall, clearRingTimeout]);
 
   // Listen for incoming calls
   useEffect(() => {
@@ -252,6 +261,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Auto-cancel after 30s
     ringTimeoutRef.current = setTimeout(() => {
+      if (callStateRef.current !== "outgoing") return;
       toast.info("Нет ответа");
       cleanupCall();
     }, 30000);
@@ -267,7 +277,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+    clearRingTimeout();
 
     // Create offer and send
     const channel = channelRef.current;
@@ -284,7 +294,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       type: "broadcast", event: "call-signal",
       payload: { type: "offer", sdp: offer, fromUserId: user.id, targetUserId: caller.userId },
     });
-  }, [user, conversationId, caller, callType, webrtc]);
+  }, [user, conversationId, caller, callType, webrtc, clearRingTimeout]);
 
   const rejectCall = useCallback(() => {
     if (!user || !caller || !channelRef.current) { cleanupCall(); return; }
