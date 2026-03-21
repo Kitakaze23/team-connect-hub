@@ -178,7 +178,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setParticipants(payload.participants || []);
 
       // Setup signaling
-      setupSignalingChannel(payload.conversationId);
+      await setupSignalingChannel(payload.conversationId);
 
       // Auto-reject after 30s
       ringTimeoutRef.current = setTimeout(() => {
