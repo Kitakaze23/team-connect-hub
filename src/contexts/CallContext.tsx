@@ -89,6 +89,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [webrtc]);
 
   const setupSignalingChannel = useCallback((convId: string) => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     const channel = supabase.channel(`call-${convId}`, {
       config: { broadcast: { self: false } },
     });
@@ -132,9 +136,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    channel.subscribe();
-    channelRef.current = channel;
-    return channel;
+    return new Promise<ReturnType<typeof supabase.channel>>((resolve) => {
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          channelRef.current = channel;
+          resolve(channel);
+        }
+      });
+    });
   }, [user, webrtc, cleanupCall]);
 
   // Listen for incoming calls
