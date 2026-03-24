@@ -38,6 +38,12 @@ interface Contact {
   avatar_url: string | null;
 }
 
+interface CallTarget {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
 const GroupsTab = () => {
   const { user, membership } = useAuth();
   const [groups, setGroups] = useState<GroupConversation[]>([]);
@@ -53,6 +59,7 @@ const GroupsTab = () => {
   const [contactSearch, setContactSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [groupCallTargets, setGroupCallTargets] = useState<CallTarget[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,6 +99,42 @@ const GroupsTab = () => {
 
   useEffect(() => {
     if (!activeGroup) return;
+
+    const fetchCallTargets = async () => {
+      if (!user) return;
+
+      const { data: members } = await supabase
+        .from("conversation_members")
+        .select("user_id")
+        .eq("conversation_id", activeGroup.id)
+        .neq("user_id", user.id);
+
+      const memberIds = members?.map((m) => m.user_id) || [];
+      if (memberIds.length === 0) {
+        setGroupCallTargets([]);
+        return;
+      }
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, avatar_url")
+        .in("user_id", memberIds);
+
+      const profileMap = new Map(profiles?.map((p) => [p.user_id, p]) || []);
+      const targets: CallTarget[] = memberIds.map((memberId) => {
+        const profile = profileMap.get(memberId);
+        const fullName = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
+
+        return {
+          userId: memberId,
+          name: fullName || "Участник",
+          avatarUrl: profile?.avatar_url || null,
+        };
+      });
+
+      setGroupCallTargets(targets);
+    };
+
     const fetchMessages = async () => {
       const { data } = await supabase
         .from("messages")
@@ -112,6 +155,8 @@ const GroupsTab = () => {
         setMessages([]);
       }
     };
+
+    fetchCallTargets();
     fetchMessages();
 
     const channel = supabase
@@ -130,7 +175,7 @@ const GroupsTab = () => {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [activeGroup]);
+  }, [activeGroup, user]);
 
   const loadContacts = async () => {
     if (!membership) return;
@@ -185,7 +230,7 @@ const GroupsTab = () => {
     return (
       <>
         <div className="shrink-0 border-b border-border bg-card/50 px-4 py-2 flex items-center gap-3">
-          <button onClick={() => { setActiveGroup(null); setMessages([]); }} className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => { setActiveGroup(null); setMessages([]); setGroupCallTargets([]); }} className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
@@ -195,7 +240,7 @@ const GroupsTab = () => {
             <span className="text-sm font-medium text-foreground">{activeGroup.name}</span>
             <span className="text-xs text-muted-foreground ml-2">{activeGroup.member_count} уч.</span>
           </div>
-          <CallButtons conversationId={activeGroup.id} targetUsers={[]} isGroup />
+          <CallButtons conversationId={activeGroup.id} targetUsers={groupCallTargets} isGroup />
           <button onClick={() => setSettingsOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors">
             <Settings className="w-5 h-5" />
           </button>
@@ -208,6 +253,7 @@ const GroupsTab = () => {
             setGroups(prev => prev.filter(g => g.id !== id));
             setActiveGroup(null);
             setMessages([]);
+            setGroupCallTargets([]);
           }}
           onGroupUpdated={(id, name, count) => {
             setGroups(prev => prev.map(g => g.id === id ? { ...g, name, member_count: count } : g));
