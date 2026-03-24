@@ -161,10 +161,45 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.log("signal_received", { type: payload.type, from: payload.fromUserId, role: callRoleRef.current });
 
       switch (payload.type) {
+        case "accept": {
+          // Callee accepted the call — CALLER now creates the offer
+          if (callRoleRef.current !== "caller") {
+            logger.log("accept_ignored_not_caller", { role: callRoleRef.current });
+            break;
+          }
+          logger.log("callee_accepted_creating_offer", { callee: payload.fromUserId });
+          try {
+            const offer = await webrtc.createOffer(
+              payload.fromUserId,
+              makeIceSender(channel, user.id, payload.fromUserId),
+              handleConnectionLost,
+            );
+            if (!offer) {
+              logger.log("caller_offer_creation_failed", { callee: payload.fromUserId });
+              break;
+            }
+            channel.send({
+              type: "broadcast", event: "call-signal",
+              payload: {
+                type: "offer",
+                sdp: offer,
+                fromUserId: user.id,
+                targetUserId: payload.fromUserId,
+                signalId: `offer-${Date.now()}`,
+              },
+            });
+            logger.log("offer_sent_to_callee", { callee: payload.fromUserId });
+          } catch (e: any) {
+            logger.log("create_offer_error", { error: e?.message || String(e) });
+          }
+          break;
+        }
         case "offer": {
-          // Only the CALLER should receive offers (from callee who accepted)
-          // In our flow: callee accepts → callee sends "accept" → caller creates offer → callee receives offer
-          // OR in the current flow: callee accepts → creates offer → sends to caller
+          // Only CALLEE should receive offers (from caller)
+          if (callRoleRef.current !== "callee") {
+            logger.log("offer_ignored_not_callee", { role: callRoleRef.current, from: payload.fromUserId });
+            break;
+          }
           try {
             const answer = await webrtc.handleOffer(
               payload.fromUserId,
@@ -197,6 +232,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         }
         case "answer": {
+          // Only CALLER should receive answers
+          if (callRoleRef.current !== "caller") {
+            logger.log("answer_ignored_not_caller", { role: callRoleRef.current });
+            break;
+          }
           await webrtc.handleAnswer(payload.fromUserId, payload.sdp);
           logger.log("answer_applied");
           clearRingTimeout();
