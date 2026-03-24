@@ -142,7 +142,7 @@ const CallOverlay = () => {
               </div>
 
               {callType === "video" && localStream && (
-                <div className="w-56 aspect-video rounded-xl overflow-hidden border border-border bg-secondary">
+                <div className="relative w-56 aspect-video rounded-xl overflow-hidden border border-border bg-secondary">
                   <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                   {isCameraOff && (
                     <div className="absolute inset-0 bg-secondary flex items-center justify-center">
