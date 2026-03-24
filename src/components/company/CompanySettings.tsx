@@ -28,11 +28,14 @@ interface ChatConversation {
   type: string;
 }
 
-type SettingsSection = "company" | "members" | "backlog" | "chats";
+type SettingsSection = "company" | "members" | "sprint" | "teams" | "desks" | "backlog" | "chats";
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Компания", icon: Building2 },
   { id: "members", label: "Участники", icon: Users },
+  { id: "sprint", label: "Спринт", icon: Timer },
+  { id: "teams", label: "Команды", icon: Users },
+  { id: "desks", label: "Рассадка", icon: LayoutList },
   { id: "backlog", label: "Бэклог", icon: LayoutList },
   { id: "chats", label: "Чаты", icon: MessageSquare },
 ];
@@ -233,8 +236,12 @@ const CompanySettings = () => {
           </div>
         </div>
       </motion.div>
+    </div>
+  );
 
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
+  const renderSprintSection = () => (
+    <div className="space-y-4">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
         <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
           <Timer className="w-4 h-4" /> Настройки спринта
         </h3>
@@ -250,8 +257,17 @@ const CompanySettings = () => {
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Сохранить"}
         </Button>
       </motion.div>
+    </div>
+  );
 
+  const renderTeamsSection = () => (
+    <div className="space-y-4">
       <TeamManagement />
+    </div>
+  );
+
+  const renderDesksSection = () => (
+    <div className="space-y-4">
       <DeskManagement />
     </div>
   );
@@ -398,6 +414,9 @@ const CompanySettings = () => {
     switch (activeSection) {
       case "company": return renderCompanySection();
       case "members": return renderMembersSection();
+      case "sprint": return renderSprintSection();
+      case "teams": return renderTeamsSection();
+      case "desks": return renderDesksSection();
       case "backlog": return renderBacklogSection();
       case "chats": return renderChatsSection();
     }
