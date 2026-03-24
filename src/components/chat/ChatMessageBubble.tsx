@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Pin } from "lucide-react";
+import MediaPreviewDialog from "./MediaPreviewDialog";
 
 interface MessageData {
   id: string;
@@ -20,6 +22,7 @@ interface ChatMessageBubbleProps {
 }
 
 const ChatMessageBubble = ({ msg, isOwn, showAuthor = true, onAvatarClick }: ChatMessageBubbleProps) => {
+  const [mediaOpen, setMediaOpen] = useState(false);
   const initials = msg.profile ? `${msg.profile.first_name?.[0] || ""}${msg.profile.last_name?.[0] || ""}` : "?";
   const displayName = msg.profile ? `${msg.profile.first_name} ${msg.profile.last_name?.[0]}.` : "Unknown";
 
@@ -32,43 +35,67 @@ const ChatMessageBubble = ({ msg, isOwn, showAuthor = true, onAvatarClick }: Cha
   const renderFileContent = () => {
     if (!msg.file_url) return null;
     if (msg.file_type === "video") {
-      return <video src={msg.file_url} controls className="max-w-full rounded-lg mt-1 max-h-64" />;
+      return (
+        <video
+          src={msg.file_url}
+          className="max-w-full rounded-lg mt-1 max-h-64 cursor-pointer"
+          onClick={() => setMediaOpen(true)}
+        />
+      );
     }
-    return <img src={msg.file_url} alt="" className="max-w-full rounded-lg mt-1 max-h-64 object-cover cursor-pointer" onClick={() => window.open(msg.file_url!, "_blank")} />;
+    return (
+      <img
+        src={msg.file_url}
+        alt=""
+        className="max-w-full rounded-lg mt-1 max-h-64 object-cover cursor-pointer"
+        onClick={() => setMediaOpen(true)}
+      />
+    );
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}>
-      {showAuthor && (
-        msg.profile?.avatar_url ? (
-          <button onClick={handleClick} className="shrink-0">
-            <img src={msg.profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all" />
-          </button>
-        ) : (
-          <button onClick={handleClick} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-mono font-bold text-foreground shrink-0 cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all">
-            {initials}
-          </button>
-        )
+    <>
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+        className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}>
+        {showAuthor && (
+          msg.profile?.avatar_url ? (
+            <button onClick={handleClick} className="shrink-0">
+              <img src={msg.profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all" />
+            </button>
+          ) : (
+            <button onClick={handleClick} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-mono font-bold text-foreground shrink-0 cursor-pointer hover:ring-2 hover:ring-accent/40 transition-all">
+              {initials}
+            </button>
+          )
+        )}
+        <div className={`max-w-[75%] ${isOwn ? "items-end" : ""}`}>
+          <div className={`flex items-center gap-2 mb-0.5 ${isOwn ? "justify-end" : ""}`}>
+            {showAuthor && (
+              <button onClick={handleClick} className="text-xs font-medium text-foreground hover:text-accent transition-colors cursor-pointer">{displayName}</button>
+            )}
+            <span className="text-[10px] text-muted-foreground">
+              {new Date(msg.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+            {msg.pinned && <Pin className="w-3 h-3 text-accent" />}
+          </div>
+          <div className={`px-3 py-2 rounded-2xl text-sm ${
+            isOwn ? "bg-primary text-primary-foreground rounded-tr-md" : "bg-card border border-border rounded-tl-md"
+          }`}>
+            {(!msg.file_url || (msg.text && msg.text !== "📷 Фото" && msg.text !== "🎥 Видео")) && msg.text}
+            {renderFileContent()}
+          </div>
+        </div>
+      </motion.div>
+
+      {msg.file_url && (
+        <MediaPreviewDialog
+          open={mediaOpen}
+          onOpenChange={setMediaOpen}
+          url={msg.file_url}
+          type={msg.file_type === "video" ? "video" : "image"}
+        />
       )}
-      <div className={`max-w-[75%] ${isOwn ? "items-end" : ""}`}>
-        <div className={`flex items-center gap-2 mb-0.5 ${isOwn ? "justify-end" : ""}`}>
-          {showAuthor && (
-            <button onClick={handleClick} className="text-xs font-medium text-foreground hover:text-accent transition-colors cursor-pointer">{displayName}</button>
-          )}
-          <span className="text-[10px] text-muted-foreground">
-            {new Date(msg.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-          </span>
-          {msg.pinned && <Pin className="w-3 h-3 text-accent" />}
-        </div>
-        <div className={`px-3 py-2 rounded-2xl text-sm ${
-          isOwn ? "bg-primary text-primary-foreground rounded-tr-md" : "bg-card border border-border rounded-tl-md"
-        }`}>
-          {(!msg.file_url || (msg.text && msg.text !== "📷 Фото" && msg.text !== "🎥 Видео")) && msg.text}
-          {renderFileContent()}
-        </div>
-      </div>
-    </motion.div>
+    </>
   );
 };
 
