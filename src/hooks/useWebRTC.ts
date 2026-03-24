@@ -4,6 +4,7 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    // Metered OpenRelay TURN (UDP, TCP, TLS)
     {
       urls: "turn:a.relay.metered.ca:80",
       username: "e8dd65a92f3aad1a0cca8cb6",
@@ -24,8 +25,24 @@ const ICE_SERVERS: RTCConfiguration = {
       username: "e8dd65a92f3aad1a0cca8cb6",
       credential: "gEn0smmGOSaoRH0B",
     },
+    // Backup: OpenRelay free TURN
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turns:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
-  iceCandidatePoolSize: 10,
+  iceCandidatePoolSize: 2,
 };
 
 export interface Participant {
@@ -38,6 +55,7 @@ export interface Participant {
 }
 
 type LogFn = (event: string, details?: Record<string, any>) => void;
+type IceRestartRequestFn = (remoteUserId: string) => void;
 
 export const useWebRTC = () => {
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -49,13 +67,19 @@ export const useWebRTC = () => {
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [connectionState, setConnectionState] = useState<string>("new");
   
-  // Guard: track whether we already have a PC being negotiated for a user
   const negotiationInProgressRef = useRef<Set<string>>(new Set());
-  // External logger injected via setLogger
   const loggerRef = useRef<LogFn>(() => {});
+  // Track ICE restart attempts per peer to limit retries
+  const iceRestartCountRef = useRef<Map<string, number>>(new Map());
+  // Callback for ICE restart renegotiation (set by CallContext)
+  const iceRestartRequestRef = useRef<IceRestartRequestFn | null>(null);
 
   const setLogger = useCallback((fn: LogFn) => {
     loggerRef.current = fn;
+  }, []);
+
+  const setIceRestartHandler = useCallback((fn: IceRestartRequestFn) => {
+    iceRestartRequestRef.current = fn;
   }, []);
 
   const log = useCallback((event: string, details?: Record<string, any>) => {
@@ -64,7 +88,6 @@ export const useWebRTC = () => {
   }, []);
 
   const getMedia = useCallback(async (video: boolean) => {
-    // If we already have a stream, reuse it
     if (localStreamRef.current) {
       const tracks = localStreamRef.current.getTracks();
       const hasAudio = tracks.some(t => t.kind === "audio" && t.readyState === "live");
@@ -73,7 +96,6 @@ export const useWebRTC = () => {
         log("media_reused");
         return localStreamRef.current;
       }
-      // Stop stale tracks
       tracks.forEach(t => t.stop());
     }
 
@@ -118,32 +140,77 @@ export const useWebRTC = () => {
       return existing;
     }
 
-    log("pc_creating", { remoteUserId });
+    log("pc_creating", { remoteUserId, iceServersCount: ICE_SERVERS.iceServers?.length });
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        log("ice_candidate_generated", { remoteUserId, candidate: event.candidate.candidate.substring(0, 50) });
+        // Log candidate type for debugging (host/srflx/relay)
+        const candidateStr = event.candidate.candidate;
+        const typeMatch = candidateStr.match(/typ (\w+)/);
+        const candidateType = typeMatch ? typeMatch[1] : "unknown";
+        log("ice_candidate_generated", { 
+          remoteUserId, 
+          type: candidateType,
+          protocol: event.candidate.protocol,
+          address: event.candidate.address,
+          candidate: candidateStr.substring(0, 80),
+        });
         onIceCandidate(event.candidate);
+      } else {
+        log("ice_gathering_complete", { remoteUserId });
       }
+    };
+
+    pc.onicegatheringstatechange = () => {
+      log("ice_gathering_state", { remoteUserId, state: pc.iceGatheringState });
     };
 
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
       log("ice_connection_state", { remoteUserId, state });
       
-      if (state === "failed") {
-        log("ice_restart_attempt", { remoteUserId });
-        pc.restartIce();
+      if (state === "connected" || state === "completed") {
+        // Reset restart counter on success
+        iceRestartCountRef.current.set(remoteUserId, 0);
+        log("ice_connected_success", { remoteUserId });
       }
+
+      if (state === "failed") {
+        const restartCount = iceRestartCountRef.current.get(remoteUserId) || 0;
+        if (restartCount < 3) {
+          iceRestartCountRef.current.set(remoteUserId, restartCount + 1);
+          log("ice_restart_attempt", { remoteUserId, attempt: restartCount + 1 });
+          // restartIce() marks the PC as needing renegotiation
+          pc.restartIce();
+          // Request the caller to create a new offer for ICE restart
+          if (iceRestartRequestRef.current) {
+            iceRestartRequestRef.current(remoteUserId);
+          }
+        } else {
+          log("ice_restart_exhausted", { remoteUserId, attempts: restartCount });
+          onDisconnected?.();
+        }
+      }
+
       if (state === "disconnected") {
-        // Give it a few seconds to reconnect before triggering callback
+        // Wait before declaring lost — ICE can recover
         setTimeout(() => {
           if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
             log("ice_disconnected_timeout", { remoteUserId, currentState: pc.iceConnectionState });
-            onDisconnected?.();
+            // Try restart before giving up
+            const restartCount = iceRestartCountRef.current.get(remoteUserId) || 0;
+            if (restartCount < 3) {
+              iceRestartCountRef.current.set(remoteUserId, restartCount + 1);
+              pc.restartIce();
+              if (iceRestartRequestRef.current) {
+                iceRestartRequestRef.current(remoteUserId);
+              }
+            } else {
+              onDisconnected?.();
+            }
           }
-        }, 10000);
+        }, 8000);
       }
     };
 
@@ -164,13 +231,12 @@ export const useWebRTC = () => {
     };
 
     pc.onconnectionstatechange = () => {
-      log("connection_state", { remoteUserId, state: pc.connectionState });
-      setConnectionState(pc.connectionState);
+      const state = pc.connectionState;
+      log("connection_state", { remoteUserId, state });
+      setConnectionState(state);
       
-      if (pc.connectionState === "failed") {
-        log("connection_failed", { remoteUserId });
-        onDisconnected?.();
-      }
+      // Don't immediately disconnect on "failed" — let ICE restart handler above deal with it
+      // Only disconnect if connection truly fails after retries (handled in oniceconnectionstatechange)
     };
 
     // Add local tracks
@@ -192,9 +258,10 @@ export const useWebRTC = () => {
     remoteUserId: string,
     onIceCandidate: (candidate: RTCIceCandidate) => void,
     onDisconnected?: () => void,
+    iceRestart?: boolean,
   ) => {
-    // Guard: prevent duplicate offer creation
-    if (negotiationInProgressRef.current.has(remoteUserId)) {
+    // Guard: prevent duplicate offer creation (but allow ICE restart)
+    if (!iceRestart && negotiationInProgressRef.current.has(remoteUserId)) {
       log("offer_skipped_negotiation_in_progress", { remoteUserId });
       return null;
     }
@@ -202,26 +269,19 @@ export const useWebRTC = () => {
 
     const pc = getOrCreatePC(remoteUserId, onIceCandidate, onDisconnected);
     
-    // Check signaling state
-    if (pc.signalingState !== "stable") {
+    // For ICE restart, we need stable or have-local-offer state
+    if (!iceRestart && pc.signalingState !== "stable") {
       log("offer_skipped_signaling_not_stable", { remoteUserId, state: pc.signalingState });
       negotiationInProgressRef.current.delete(remoteUserId);
       return null;
     }
 
     try {
-      log("creating_offer", { remoteUserId });
-      const offer = await pc.createOffer();
-      
-      // Re-check state after async op
-      if (pc.signalingState !== "stable") {
-        log("offer_aborted_state_changed", { remoteUserId, state: pc.signalingState });
-        negotiationInProgressRef.current.delete(remoteUserId);
-        return null;
-      }
+      log("creating_offer", { remoteUserId, iceRestart: !!iceRestart });
+      const offer = await pc.createOffer({ iceRestart: !!iceRestart });
       
       await pc.setLocalDescription(offer);
-      log("offer_created_and_set", { remoteUserId });
+      log("offer_created_and_set", { remoteUserId, iceRestart: !!iceRestart });
       return offer;
     } catch (e: any) {
       log("create_offer_error", { remoteUserId, error: e.message });
@@ -331,6 +391,7 @@ export const useWebRTC = () => {
     peerConnectionsRef.current.clear();
     pendingCandidatesRef.current.clear();
     negotiationInProgressRef.current.clear();
+    iceRestartCountRef.current.clear();
     setRemoteStreams(new Map());
     setIsMuted(false);
     setIsCameraOff(false);
@@ -344,6 +405,6 @@ export const useWebRTC = () => {
   return {
     localStream, remoteStreams, isMuted, isCameraOff, connectionState,
     getMedia, createOffer, handleOffer, handleAnswer, handleIceCandidate,
-    toggleMute, toggleCamera, cleanup, setLogger,
+    toggleMute, toggleCamera, cleanup, setLogger, setIceRestartHandler,
   };
 };

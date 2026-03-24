@@ -61,9 +61,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const ringTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Dedup: track processed signal IDs
   const processedSignalsRef = useRef<Set<string>>(new Set());
-  // Role in current call: "caller" or "callee"
   const callRoleRef = useRef<"caller" | "callee" | null>(null);
 
   // Wire logger into WebRTC
@@ -136,6 +134,51 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cleanupCall, logger]);
 
+  // ICE restart handler: caller creates a new offer with iceRestart=true and sends it
+  const handleIceRestartRequest = useCallback((remoteUserId: string) => {
+    if (callRoleRef.current !== "caller") {
+      logger.log("ice_restart_ignored_not_caller", { role: callRoleRef.current });
+      return;
+    }
+    const channel = channelRef.current;
+    if (!channel || !user) return;
+
+    logger.log("ice_restart_creating_offer", { remoteUserId });
+
+    (async () => {
+      try {
+        const offer = await webrtc.createOffer(
+          remoteUserId,
+          makeIceSender(channel, user.id, remoteUserId),
+          handleConnectionLost,
+          true, // iceRestart flag
+        );
+        if (!offer) {
+          logger.log("ice_restart_offer_failed", { remoteUserId });
+          return;
+        }
+        channel.send({
+          type: "broadcast", event: "call-signal",
+          payload: {
+            type: "offer",
+            sdp: offer,
+            fromUserId: user.id,
+            targetUserId: remoteUserId,
+            signalId: `offer-restart-${Date.now()}`,
+          },
+        });
+        logger.log("ice_restart_offer_sent", { remoteUserId });
+      } catch (e: any) {
+        logger.log("ice_restart_error", { error: e?.message || String(e) });
+      }
+    })();
+  }, [user, webrtc, makeIceSender, handleConnectionLost, logger]);
+
+  // Wire ICE restart handler into WebRTC
+  useEffect(() => {
+    webrtc.setIceRestartHandler(handleIceRestartRequest);
+  }, [webrtc.setIceRestartHandler, handleIceRestartRequest]);
+
   const setupSignalingChannel = useCallback((convId: string) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -148,7 +191,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     channel.on("broadcast", { event: "call-signal" }, async ({ payload }) => {
       if (!user || payload.targetUserId !== user.id) return;
 
-      // Dedup: skip already processed signals (except ICE which can be many)
       const signalId = payload.signalId;
       if (signalId && payload.type !== "ice-candidate") {
         if (processedSignalsRef.current.has(signalId)) {
@@ -162,7 +204,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       switch (payload.type) {
         case "accept": {
-          // Callee accepted the call — CALLER now creates the offer
           if (callRoleRef.current !== "caller") {
             logger.log("accept_ignored_not_caller", { role: callRoleRef.current });
             break;
@@ -195,7 +236,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         }
         case "offer": {
-          // Only CALLEE should receive offers (from caller)
+          // Callee handles offers (including ICE restart offers)
           if (callRoleRef.current !== "callee") {
             logger.log("offer_ignored_not_callee", { role: callRoleRef.current, from: payload.fromUserId });
             break;
@@ -232,7 +273,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         }
         case "answer": {
-          // Only CALLER should receive answers
           if (callRoleRef.current !== "caller") {
             logger.log("answer_ignored_not_caller", { role: callRoleRef.current });
             break;
@@ -401,7 +441,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     logger.log("accept_call", { callType, callerId: caller.userId });
 
-    // 1. Acquire media first
     try {
       await webrtc.getMedia(callType === "video");
       logger.log("media_acquired_callee", { type: callType });
@@ -419,7 +458,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // 2. Send "accept" signal to caller — caller will then create the offer
     channel.send({
       type: "broadcast", event: "call-signal",
       payload: {
