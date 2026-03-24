@@ -28,11 +28,14 @@ interface ChatConversation {
   type: string;
 }
 
-type SettingsSection = "company" | "members" | "backlog" | "chats";
+type SettingsSection = "company" | "members" | "sprint" | "teams" | "desks" | "backlog" | "chats";
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Компания", icon: Building2 },
   { id: "members", label: "Участники", icon: Users },
+  { id: "sprint", label: "Спринт", icon: Timer },
+  { id: "teams", label: "Команды", icon: Users },
+  { id: "desks", label: "Рассадка", icon: LayoutList },
   { id: "backlog", label: "Бэклог", icon: LayoutList },
   { id: "chats", label: "Чаты", icon: MessageSquare },
 ];
