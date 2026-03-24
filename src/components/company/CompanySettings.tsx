@@ -433,6 +433,98 @@ const CompanySettings = () => {
     </div>
   );
 
+  const renderLoggingSection = () => {
+    const grouped = callLogs.reduce((acc: Record<string, any[]>, log: any) => {
+      const key = log.call_session_id || "unknown";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(log);
+      return acc;
+    }, {});
+
+    return (
+      <div className="space-y-4">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl p-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
+              <ScrollText className="w-4 h-4" /> Логи звонков
+            </h3>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={fetchCallLogs} className="h-7 text-xs">
+                Обновить
+              </Button>
+              {callLogs.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive">
+                      <Trash2 className="w-3 h-3 mr-1" /> Очистить
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Очистить все логи?</AlertDialogTitle>
+                      <AlertDialogDescription>Все логи звонков будут удалены.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearCallLogs} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Очистить</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Подробные логи всех этапов аудио и видеозвонков для диагностики проблем.</p>
+
+          {callLogsLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto" />
+          ) : callLogs.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">Нет логов. Совершите звонок для генерации логов.</p>
+          ) : (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {Object.entries(grouped).map(([sessionId, logs]) => {
+                const firstLog = logs[logs.length - 1];
+                const lastLog = logs[0];
+                const startTime = new Date(firstLog.created_at).toLocaleString("ru");
+                return (
+                  <div key={sessionId} className="border border-border rounded-xl overflow-hidden">
+                    <div className="bg-secondary/50 px-3 py-2 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-mono font-medium text-foreground">Сессия</span>
+                        <span className="text-xs font-mono text-muted-foreground ml-2">{startTime}</span>
+                      </div>
+                      <span className="text-xs font-mono text-muted-foreground">{logs.length} событий</span>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {logs.map((log: any) => {
+                        const time = new Date(log.created_at).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
+                        const details = log.details && Object.keys(log.details).length > 0
+                          ? JSON.stringify(log.details, null, 0)
+                          : null;
+                        return (
+                          <div key={log.id} className="px-3 py-1.5 flex gap-2 items-start text-xs">
+                            <span className="font-mono text-muted-foreground shrink-0 w-[85px]">{time}</span>
+                            <span className={`font-mono font-medium shrink-0 ${
+                              log.event.includes("error") ? "text-destructive" :
+                              log.event.includes("active") || log.event.includes("acquired") ? "text-accent" :
+                              "text-foreground"
+                            }`}>{log.event}</span>
+                            {details && (
+                              <span className="font-mono text-muted-foreground truncate" title={details}>{details}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case "company": return renderCompanySection();
@@ -442,6 +534,7 @@ const CompanySettings = () => {
       case "desks": return renderDesksSection();
       case "backlog": return renderBacklogSection();
       case "chats": return renderChatsSection();
+      case "logging": return renderLoggingSection();
     }
   };
 
