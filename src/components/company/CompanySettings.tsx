@@ -482,8 +482,8 @@ const CompanySettings = () => {
           ) : (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto">
               {Object.entries(grouped).map(([sessionId, logs]) => {
-                const firstLog = logs[logs.length - 1];
-                const lastLog = logs[0];
+                const logsArr = logs as any[];
+                const firstLog = logsArr[logsArr.length - 1];
                 const startTime = new Date(firstLog.created_at).toLocaleString("ru");
                 return (
                   <div key={sessionId} className="border border-border rounded-xl overflow-hidden">
@@ -492,11 +492,11 @@ const CompanySettings = () => {
                         <span className="text-xs font-mono font-medium text-foreground">Сессия</span>
                         <span className="text-xs font-mono text-muted-foreground ml-2">{startTime}</span>
                       </div>
-                      <span className="text-xs font-mono text-muted-foreground">{logs.length} событий</span>
+                      <span className="text-xs font-mono text-muted-foreground">{logsArr.length} событий</span>
                     </div>
                     <div className="divide-y divide-border">
-                      {logs.map((log: any) => {
-                        const time = new Date(log.created_at).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
+                      {logsArr.map((log: any) => {
+                        const time = new Date(log.created_at).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", second: "2-digit" } as any);
                         const details = log.details && Object.keys(log.details).length > 0
                           ? JSON.stringify(log.details, null, 0)
                           : null;
