@@ -236,8 +236,12 @@ const CompanySettings = () => {
           </div>
         </div>
       </motion.div>
+    </div>
+  );
 
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
+  const renderSprintSection = () => (
+    <div className="space-y-4">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
         <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
           <Timer className="w-4 h-4" /> Настройки спринта
         </h3>
@@ -253,8 +257,17 @@ const CompanySettings = () => {
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Сохранить"}
         </Button>
       </motion.div>
+    </div>
+  );
 
+  const renderTeamsSection = () => (
+    <div className="space-y-4">
       <TeamManagement />
+    </div>
+  );
+
+  const renderDesksSection = () => (
+    <div className="space-y-4">
       <DeskManagement />
     </div>
   );
