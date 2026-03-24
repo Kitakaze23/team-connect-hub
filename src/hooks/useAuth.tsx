@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -29,6 +29,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [membership, setMembership] = useState<CompanyMembership | null>(null);
   const [membershipLoading, setMembershipLoading] = useState(true);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const currentUserRef = useRef<User | null>(null);
+  const currentMembershipRef = useRef<CompanyMembership | null>(null);
+
+  useEffect(() => {
+    currentUserRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    currentMembershipRef.current = membership;
+  }, [membership]);
 
   const fetchMembership = async (userId: string) => {
     setMembershipLoading(true);
@@ -82,14 +92,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+
         if (session?.user) {
-          setTimeout(() => {
-            fetchMembership(session.user.id);
-            checkPlatformAdmin(session.user.id);
-          }, 0);
+          const isSameUser = currentUserRef.current?.id === session.user.id;
+          const hasLoadedMembership = currentMembershipRef.current !== null;
+          const isBackgroundAuthRefresh = (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")
+            && isSameUser
+            && hasLoadedMembership;
+
+          if (!isBackgroundAuthRefresh) {
+            setTimeout(() => {
+              fetchMembership(session.user.id);
+              checkPlatformAdmin(session.user.id);
+            }, 0);
+          }
         } else {
           setMembership(null);
           setMembershipLoading(false);
