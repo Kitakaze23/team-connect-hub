@@ -161,10 +161,45 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.log("signal_received", { type: payload.type, from: payload.fromUserId, role: callRoleRef.current });
 
       switch (payload.type) {
+        case "accept": {
+          // Callee accepted the call — CALLER now creates the offer
+          if (callRoleRef.current !== "caller") {
+            logger.log("accept_ignored_not_caller", { role: callRoleRef.current });
+            break;
+          }
+          logger.log("callee_accepted_creating_offer", { callee: payload.fromUserId });
+          try {
+            const offer = await webrtc.createOffer(
+              payload.fromUserId,
+              makeIceSender(channel, user.id, payload.fromUserId),
+              handleConnectionLost,
+            );
+            if (!offer) {
+              logger.log("caller_offer_creation_failed", { callee: payload.fromUserId });
+              break;
+            }
+            channel.send({
+              type: "broadcast", event: "call-signal",
+              payload: {
+                type: "offer",
+                sdp: offer,
+                fromUserId: user.id,
+                targetUserId: payload.fromUserId,
+                signalId: `offer-${Date.now()}`,
+              },
+            });
+            logger.log("offer_sent_to_callee", { callee: payload.fromUserId });
+          } catch (e: any) {
+            logger.log("create_offer_error", { error: e?.message || String(e) });
+          }
+          break;
+        }
         case "offer": {
-          // Only the CALLER should receive offers (from callee who accepted)
-          // In our flow: callee accepts → callee sends "accept" → caller creates offer → callee receives offer
-          // OR in the current flow: callee accepts → creates offer → sends to caller
+          // Only CALLEE should receive offers (from caller)
+          if (callRoleRef.current !== "callee") {
+            logger.log("offer_ignored_not_callee", { role: callRoleRef.current, from: payload.fromUserId });
+            break;
+          }
           try {
             const answer = await webrtc.handleOffer(
               payload.fromUserId,
@@ -197,6 +232,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         }
         case "answer": {
+          // Only CALLER should receive answers
+          if (callRoleRef.current !== "caller") {
+            logger.log("answer_ignored_not_caller", { role: callRoleRef.current });
+            break;
+          }
           await webrtc.handleAnswer(payload.fromUserId, payload.sdp);
           logger.log("answer_applied");
           clearRingTimeout();
@@ -361,6 +401,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     logger.log("accept_call", { callType, callerId: caller.userId });
 
+    // 1. Acquire media first
     try {
       await webrtc.getMedia(callType === "video");
       logger.log("media_acquired_callee", { type: callType });
@@ -378,31 +419,18 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Callee creates the offer (this is the established flow in the app)
-    logger.log("callee_creating_offer", { callerId: caller.userId });
-    const offer = await webrtc.createOffer(
-      caller.userId,
-      makeIceSender(channel, user.id, caller.userId),
-      handleConnectionLost,
-    );
-
-    if (!offer) {
-      logger.log("callee_offer_creation_failed");
-      return;
-    }
-
+    // 2. Send "accept" signal to caller — caller will then create the offer
     channel.send({
       type: "broadcast", event: "call-signal",
       payload: {
-        type: "offer",
-        sdp: offer,
+        type: "accept",
         fromUserId: user.id,
         targetUserId: caller.userId,
-        signalId: `offer-${Date.now()}`,
+        signalId: `accept-${Date.now()}`,
       },
     });
-    logger.log("offer_sent_to_caller", { callerId: caller.userId });
-  }, [user, conversationId, caller, callType, webrtc, clearRingTimeout, logger, makeIceSender, handleConnectionLost]);
+    logger.log("accept_signal_sent", { callerId: caller.userId });
+  }, [user, conversationId, caller, callType, webrtc, clearRingTimeout, logger]);
 
   const rejectCall = useCallback(() => {
     logger.log("reject_call", { callerId: caller?.userId });
