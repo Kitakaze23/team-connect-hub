@@ -269,6 +269,44 @@ export type Database = {
           },
         ]
       }
+      call_debug_logs: {
+        Row: {
+          call_session_id: string
+          company_id: string
+          created_at: string
+          details: Json | null
+          event: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          call_session_id: string
+          company_id: string
+          created_at?: string
+          details?: Json | null
+          event: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          call_session_id?: string
+          company_id?: string
+          created_at?: string
+          details?: Json | null
+          event?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_debug_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_logs: {
         Row: {
           call_type: string

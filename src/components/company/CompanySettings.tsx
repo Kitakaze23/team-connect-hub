@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2, Timer, LayoutList, MessageSquare, Trash2 } from "lucide-react";
+import { Building2, Users, Copy, Check, UserPlus, UserMinus, Shield, ShieldOff, Loader2, Timer, LayoutList, MessageSquare, Trash2, ScrollText } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import TeamManagement from "./TeamManagement";
 import DeskManagement from "./DeskManagement";
@@ -28,7 +28,7 @@ interface ChatConversation {
   type: string;
 }
 
-type SettingsSection = "company" | "members" | "sprint" | "teams" | "desks" | "backlog" | "chats";
+type SettingsSection = "company" | "members" | "sprint" | "teams" | "desks" | "backlog" | "chats" | "logging";
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Компания", icon: Building2 },
@@ -38,6 +38,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: typeof Building2 }[]
   { id: "desks", label: "Рассадка", icon: LayoutList },
   { id: "backlog", label: "Бэклог", icon: LayoutList },
   { id: "chats", label: "Чаты", icon: MessageSquare },
+  { id: "logging", label: "Логгирование", icon: ScrollText },
 ];
 
 const CompanySettings = () => {
@@ -57,6 +58,8 @@ const CompanySettings = () => {
   const [saving, setSaving] = useState(false);
   const [chats, setChats] = useState<ChatConversation[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
+  const [callLogs, setCallLogs] = useState<any[]>([]);
+  const [callLogsLoading, setCallLogsLoading] = useState(false);
 
   const companyId = membership?.company_id;
 
@@ -118,8 +121,28 @@ const CompanySettings = () => {
     fetchData();
   }, [companyId]);
 
+  const fetchCallLogs = async () => {
+    if (!companyId) return;
+    setCallLogsLoading(true);
+    const { data } = await supabase
+      .from("call_debug_logs")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .limit(200) as any;
+    setCallLogs(data || []);
+    setCallLogsLoading(false);
+  };
+
+  const handleClearCallLogs = async () => {
+    if (!companyId) return;
+    await (supabase.from("call_debug_logs") as any).delete().eq("company_id", companyId);
+    setCallLogs([]);
+  };
+
   useEffect(() => {
     if (activeSection === "chats") fetchChats();
+    if (activeSection === "logging") fetchCallLogs();
   }, [activeSection, companyId]);
 
   useEffect(() => {
@@ -410,6 +433,98 @@ const CompanySettings = () => {
     </div>
   );
 
+  const renderLoggingSection = () => {
+    const grouped = callLogs.reduce((acc: Record<string, any[]>, log: any) => {
+      const key = log.call_session_id || "unknown";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(log);
+      return acc;
+    }, {});
+
+    return (
+      <div className="space-y-4">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl p-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
+              <ScrollText className="w-4 h-4" /> Логи звонков
+            </h3>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={fetchCallLogs} className="h-7 text-xs">
+                Обновить
+              </Button>
+              {callLogs.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive">
+                      <Trash2 className="w-3 h-3 mr-1" /> Очистить
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Очистить все логи?</AlertDialogTitle>
+                      <AlertDialogDescription>Все логи звонков будут удалены.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Отмена</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearCallLogs} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Очистить</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Подробные логи всех этапов аудио и видеозвонков для диагностики проблем.</p>
+
+          {callLogsLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto" />
+          ) : callLogs.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">Нет логов. Совершите звонок для генерации логов.</p>
+          ) : (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {Object.entries(grouped).map(([sessionId, logs]) => {
+                const logsArr = logs as any[];
+                const firstLog = logsArr[logsArr.length - 1];
+                const startTime = new Date(firstLog.created_at).toLocaleString("ru");
+                return (
+                  <div key={sessionId} className="border border-border rounded-xl overflow-hidden">
+                    <div className="bg-secondary/50 px-3 py-2 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-mono font-medium text-foreground">Сессия</span>
+                        <span className="text-xs font-mono text-muted-foreground ml-2">{startTime}</span>
+                      </div>
+                      <span className="text-xs font-mono text-muted-foreground">{logsArr.length} событий</span>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {logsArr.map((log: any) => {
+                        const time = new Date(log.created_at).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", second: "2-digit" } as any);
+                        const details = log.details && Object.keys(log.details).length > 0
+                          ? JSON.stringify(log.details, null, 0)
+                          : null;
+                        return (
+                          <div key={log.id} className="px-3 py-1.5 flex gap-2 items-start text-xs">
+                            <span className="font-mono text-muted-foreground shrink-0 w-[85px]">{time}</span>
+                            <span className={`font-mono font-medium shrink-0 ${
+                              log.event.includes("error") ? "text-destructive" :
+                              log.event.includes("active") || log.event.includes("acquired") ? "text-accent" :
+                              "text-foreground"
+                            }`}>{log.event}</span>
+                            {details && (
+                              <span className="font-mono text-muted-foreground truncate" title={details}>{details}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case "company": return renderCompanySection();
@@ -419,6 +534,7 @@ const CompanySettings = () => {
       case "desks": return renderDesksSection();
       case "backlog": return renderBacklogSection();
       case "chats": return renderChatsSection();
+      case "logging": return renderLoggingSection();
     }
   };
 

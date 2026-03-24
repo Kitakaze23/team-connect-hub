@@ -29,14 +29,17 @@ export const useWebRTC = () => {
 
   const getMedia = useCallback(async (video: boolean) => {
     try {
+      console.log("[WebRTC] Requesting media:", { audio: true, video });
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: video ? { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } : false,
       });
+      console.log("[WebRTC] Media acquired, tracks:", stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
       localStreamRef.current = stream;
       setLocalStream(stream);
       return stream;
     } catch (err: any) {
+      console.error("[WebRTC] Media error:", err.name, err.message);
       throw new Error(err.name === "NotAllowedError" ? "no_permission" : "media_error");
     }
   }, []);
@@ -44,11 +47,12 @@ export const useWebRTC = () => {
   const flushPendingCandidates = useCallback(async (remoteUserId: string, pc: RTCPeerConnection) => {
     const pending = pendingCandidatesRef.current.get(remoteUserId);
     if (pending && pending.length > 0) {
+      console.log(`[WebRTC] Flushing ${pending.length} pending ICE candidates for ${remoteUserId}`);
       for (const candidate of pending) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (e) {
-          console.warn("Error adding queued ICE candidate:", e);
+          console.warn("[WebRTC] Error adding queued ICE candidate:", e);
         }
       }
       pendingCandidatesRef.current.delete(remoteUserId);
@@ -56,13 +60,26 @@ export const useWebRTC = () => {
   }, []);
 
   const createPeerConnection = useCallback((remoteUserId: string, onIceCandidate: (candidate: RTCIceCandidate) => void) => {
+    console.log("[WebRTC] Creating PeerConnection for:", remoteUserId);
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
     pc.onicecandidate = (event) => {
-      if (event.candidate) onIceCandidate(event.candidate);
+      if (event.candidate) {
+        console.log("[WebRTC] ICE candidate generated for:", remoteUserId);
+        onIceCandidate(event.candidate);
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[WebRTC] ICE connection state [${remoteUserId}]:`, pc.iceConnectionState);
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log(`[WebRTC] Signaling state [${remoteUserId}]:`, pc.signalingState);
     };
 
     pc.ontrack = (event) => {
+      console.log(`[WebRTC] Remote track received [${remoteUserId}]:`, event.track.kind, event.track.readyState);
       setRemoteStreams(prev => {
         const next = new Map(prev);
         next.set(remoteUserId, event.streams[0]);
@@ -71,14 +88,18 @@ export const useWebRTC = () => {
     };
 
     pc.onconnectionstatechange = () => {
+      console.log(`[WebRTC] Connection state [${remoteUserId}]:`, pc.connectionState);
       setConnectionState(pc.connectionState);
     };
 
-    // Add local tracks
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
+      const tracks = localStreamRef.current.getTracks();
+      console.log(`[WebRTC] Adding ${tracks.length} local tracks to PC`);
+      tracks.forEach(track => {
         pc.addTrack(track, localStreamRef.current!);
       });
+    } else {
+      console.warn("[WebRTC] No local stream when creating PeerConnection!");
     }
 
     peerConnectionsRef.current.set(remoteUserId, pc);
@@ -86,9 +107,11 @@ export const useWebRTC = () => {
   }, []);
 
   const createOffer = useCallback(async (remoteUserId: string, onIceCandidate: (candidate: RTCIceCandidate) => void) => {
+    console.log("[WebRTC] Creating offer for:", remoteUserId);
     const pc = createPeerConnection(remoteUserId, onIceCandidate);
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    console.log("[WebRTC] Offer created and set as local description");
     return offer;
   }, [createPeerConnection]);
 
@@ -97,21 +120,26 @@ export const useWebRTC = () => {
     offer: RTCSessionDescriptionInit,
     onIceCandidate: (candidate: RTCIceCandidate) => void
   ) => {
+    console.log("[WebRTC] Handling offer from:", remoteUserId);
     const pc = createPeerConnection(remoteUserId, onIceCandidate);
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    // Flush any candidates that arrived before the PC was ready
+    console.log("[WebRTC] Remote description set (offer)");
     await flushPendingCandidates(remoteUserId, pc);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    console.log("[WebRTC] Answer created and set as local description");
     return answer;
   }, [createPeerConnection, flushPendingCandidates]);
 
   const handleAnswer = useCallback(async (remoteUserId: string, answer: RTCSessionDescriptionInit) => {
+    console.log("[WebRTC] Handling answer from:", remoteUserId);
     const pc = peerConnectionsRef.current.get(remoteUserId);
     if (pc) {
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      // Flush any candidates that arrived before the answer was set
+      console.log("[WebRTC] Remote description set (answer)");
       await flushPendingCandidates(remoteUserId, pc);
+    } else {
+      console.warn("[WebRTC] No PeerConnection found for:", remoteUserId);
     }
   }, [flushPendingCandidates]);
 
@@ -120,15 +148,16 @@ export const useWebRTC = () => {
     if (pc && pc.remoteDescription) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log("[WebRTC] ICE candidate added for:", remoteUserId);
       } catch (e) {
-        console.warn("Error adding ICE candidate:", e);
+        console.warn("[WebRTC] Error adding ICE candidate:", e);
       }
     } else {
-      // Queue the candidate for later
       if (!pendingCandidatesRef.current.has(remoteUserId)) {
         pendingCandidatesRef.current.set(remoteUserId, []);
       }
       pendingCandidatesRef.current.get(remoteUserId)!.push(candidate);
+      console.log(`[WebRTC] Queued ICE candidate for ${remoteUserId}, total queued: ${pendingCandidatesRef.current.get(remoteUserId)!.length}`);
     }
   }, []);
 
@@ -147,6 +176,7 @@ export const useWebRTC = () => {
   }, []);
 
   const cleanup = useCallback(() => {
+    console.log("[WebRTC] Cleanup");
     localStreamRef.current?.getTracks().forEach(t => t.stop());
     localStreamRef.current = null;
     setLocalStream(null);
