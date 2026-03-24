@@ -19,17 +19,30 @@ const CallOverlay = () => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+  const attachMediaStream = (element: HTMLMediaElement | null, stream: MediaStream | null) => {
+    if (!element) return;
+
+    if (!stream) {
+      element.srcObject = null;
+      return;
     }
+
+    if (element.srcObject !== stream) {
+      element.srcObject = stream;
+    }
+
+    void element.play().catch(() => {
+      // autoplay can be blocked by browser policy; user action will allow playback
+    });
+  };
+
+  useEffect(() => {
+    attachMediaStream(localVideoRef.current, localStream);
   }, [localStream]);
 
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStreams.size > 0) {
-      const firstStream = remoteStreams.values().next().value;
-      if (firstStream) remoteVideoRef.current.srcObject = firstStream;
-    }
+    const firstStream = remoteStreams.values().next().value ?? null;
+    attachMediaStream(remoteVideoRef.current, firstStream);
   }, [remoteStreams]);
 
   if (callState === "idle") return null;
@@ -127,6 +140,18 @@ const CallOverlay = () => {
                   ))}
                 </motion.div>
               </div>
+
+              {callType === "video" && localStream && (
+                <div className="relative w-56 aspect-video rounded-xl overflow-hidden border border-border bg-secondary">
+                  <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                  {isCameraOff && (
+                    <div className="absolute inset-0 bg-secondary flex items-center justify-center">
+                      <VideoOff className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button onClick={endCall}
                 className="w-16 h-16 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90 transition-opacity mt-4">
                 <PhoneOff className="w-7 h-7" />
@@ -211,6 +236,22 @@ const CallOverlay = () => {
               </div>
             </motion.div>
           )}
+
+          {Array.from(remoteStreams.entries()).map(([participantId, stream], index) => {
+            if (callType === "video" && index === 0) return null;
+
+            return (
+              <audio
+                key={participantId}
+                autoPlay
+                playsInline
+                className="hidden"
+                ref={(node) => {
+                  attachMediaStream(node, stream);
+                }}
+              />
+            );
+          })}
         </div>
       </motion.div>
     </AnimatePresence>

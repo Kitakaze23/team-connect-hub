@@ -25,8 +25,9 @@ const queryClient = new QueryClient({
 
 const AppRoutes = () => {
   const { user, loading, membership, membershipLoading, isPlatformAdmin } = useAuth();
+  const isInitialMembershipLoad = Boolean(user) && !isPlatformAdmin && !membership && membershipLoading;
 
-  if (loading || membershipLoading) {
+  if (loading || isInitialMembershipLoad) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-accent" />
