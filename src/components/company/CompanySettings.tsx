@@ -58,6 +58,8 @@ const CompanySettings = () => {
   const [saving, setSaving] = useState(false);
   const [chats, setChats] = useState<ChatConversation[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
+  const [callLogs, setCallLogs] = useState<any[]>([]);
+  const [callLogsLoading, setCallLogsLoading] = useState(false);
 
   const companyId = membership?.company_id;
 
