@@ -414,6 +414,9 @@ const CompanySettings = () => {
     switch (activeSection) {
       case "company": return renderCompanySection();
       case "members": return renderMembersSection();
+      case "sprint": return renderSprintSection();
+      case "teams": return renderTeamsSection();
+      case "desks": return renderDesksSection();
       case "backlog": return renderBacklogSection();
       case "chats": return renderChatsSection();
     }
