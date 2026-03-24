@@ -121,8 +121,28 @@ const CompanySettings = () => {
     fetchData();
   }, [companyId]);
 
+  const fetchCallLogs = async () => {
+    if (!companyId) return;
+    setCallLogsLoading(true);
+    const { data } = await supabase
+      .from("call_debug_logs")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .limit(200) as any;
+    setCallLogs(data || []);
+    setCallLogsLoading(false);
+  };
+
+  const handleClearCallLogs = async () => {
+    if (!companyId) return;
+    await (supabase.from("call_debug_logs") as any).delete().eq("company_id", companyId);
+    setCallLogs([]);
+  };
+
   useEffect(() => {
     if (activeSection === "chats") fetchChats();
+    if (activeSection === "logging") fetchCallLogs();
   }, [activeSection, companyId]);
 
   useEffect(() => {
