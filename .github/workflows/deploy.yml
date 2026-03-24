@@ -1,31 +1,52 @@
-script: |
-  set -e
+name: Deploy Frontend  # Название workflow
 
-  echo "🚀 START DEPLOY"
+on:
+  push:
+    branches:
+      - main  # Запускать деплой при пуше в main
 
-  cd /root/team-connect-hub || exit
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-  echo "📥 Updating code"
-  git reset --hard
-  git pull origin main
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-  echo "📦 Installing dependencies"
-  npm install
+      - name: Connect and deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: root
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
 
-  echo "🏗 Building project"
-  npm run build
+            echo "🚀 START DEPLOY"
 
-  echo "🧹 Cleaning nginx folder"
-  rm -rf /var/www/teamhub/*
+            cd /root/team-connect-hub || exit
 
-  echo "📤 Copying new build"
-  cp -r dist/* /var/www/teamhub/
+            echo "📥 Updating code"
+            git reset --hard
+            git pull origin main
 
-  echo "🔐 Fix permissions"
-  chown -R www-data:www-data /var/www/teamhub
-  chmod -R 755 /var/www/teamhub
+            echo "📦 Installing dependencies"
+            npm install
 
-  echo "🔄 Reload nginx"
-  systemctl reload nginx
+            echo "🏗 Building project"
+            npm run build
 
-  echo "✅ DEPLOY DONE"
+            echo "🧹 Cleaning nginx folder"
+            rm -rf /var/www/teamhub/*
+
+            echo "📤 Copying new build"
+            cp -r dist/* /var/www/teamhub/
+
+            echo "🔐 Fix permissions"
+            chown -R www-data:www-data /var/www/teamhub
+            chmod -R 755 /var/www/teamhub
+
+            echo "🔄 Reload nginx"
+            systemctl reload nginx
+
+            echo "✅ DEPLOY DONE"
