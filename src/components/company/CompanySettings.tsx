@@ -28,7 +28,7 @@ interface ChatConversation {
   type: string;
 }
 
-type SettingsSection = "company" | "members" | "sprint" | "teams" | "desks" | "backlog" | "chats";
+type SettingsSection = "company" | "members" | "sprint" | "teams" | "desks" | "backlog" | "chats" | "logging";
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Компания", icon: Building2 },
@@ -38,6 +38,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: typeof Building2 }[]
   { id: "desks", label: "Рассадка", icon: LayoutList },
   { id: "backlog", label: "Бэклог", icon: LayoutList },
   { id: "chats", label: "Чаты", icon: MessageSquare },
+  { id: "logging", label: "Логгирование", icon: ScrollText },
 ];
 
 const CompanySettings = () => {
