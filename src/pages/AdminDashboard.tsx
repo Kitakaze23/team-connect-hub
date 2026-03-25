@@ -34,6 +34,8 @@ import {
   Plus,
   Ban,
   CheckCircle2,
+  Trash2,
+  User,
 } from "lucide-react";
 
 interface Company {
@@ -84,9 +86,11 @@ const AdminDashboard = () => {
   const [createSaving, setCreateSaving] = useState(false);
 
   // User management dialog
-  const [editUser, setEditUser] = useState<{ user_id: string; email: string; name: string } | null>(null);
+  const [editUser, setEditUser] = useState<{ user_id: string; email: string; name: string; role: string; company_id: string } | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
   const [userSaving, setUserSaving] = useState(false);
 
   // Audit logs
@@ -243,6 +247,57 @@ const AdminDashboard = () => {
     } catch (err: any) {
       toast({ title: "Ошибка", description: err.message, variant: "destructive" });
     }
+  };
+
+  const handleDeleteCompany = async (companyId: string, companyName: string) => {
+    if (!window.confirm(`Вы уверены, что хотите удалить компанию «${companyName}»? Все данные будут потеряны.`)) return;
+    try {
+      await callAdmin("delete_company", { company_id: companyId });
+      toast({ title: "Компания удалена" });
+      setCompanyDetails((prev) => { const n = { ...prev }; delete n[companyId]; return n; });
+      fetchCompanies();
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleUpdateUserName = async () => {
+    if (!editUser || !newFirstName.trim()) return;
+    setUserSaving(true);
+    try {
+      await callAdmin("update_user_name", { target_user_id: editUser.user_id, first_name: newFirstName.trim(), last_name: newLastName.trim() });
+      toast({ title: "ФИО обновлено" });
+      // Refresh details
+      const companyIds = Object.keys(companyDetails);
+      for (const cid of companyIds) {
+        const data = await callAdmin("get_company_details", { company_id: cid });
+        if (data) setCompanyDetails((prev) => ({ ...prev, [cid]: data }));
+      }
+      setEditUser((prev) => prev ? { ...prev, name: `${newLastName.trim()} ${newFirstName.trim()}`.trim() } : null);
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+    setUserSaving(false);
+  };
+
+  const handleToggleRole = async () => {
+    if (!editUser) return;
+    const newRole = editUser.role === "admin" ? "user" : "admin";
+    setUserSaving(true);
+    try {
+      await callAdmin("set_user_role", { target_user_id: editUser.user_id, company_id: editUser.company_id, new_role: newRole });
+      toast({ title: newRole === "admin" ? "Назначен администратором" : "Роль изменена на пользователя" });
+      setEditUser((prev) => prev ? { ...prev, role: newRole } : null);
+      // Refresh details
+      const companyIds = Object.keys(companyDetails);
+      for (const cid of companyIds) {
+        const data = await callAdmin("get_company_details", { company_id: cid });
+        if (data) setCompanyDetails((prev) => ({ ...prev, [cid]: data }));
+      }
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+    setUserSaving(false);
   };
 
   const handleUpdateEmail = async () => {
@@ -458,6 +513,15 @@ const AdminDashboard = () => {
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteCompany(company.id, company.name)}
+                      title="Удалить компанию"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
 
@@ -470,11 +534,15 @@ const AdminDashboard = () => {
                     ) : companyDetails[company.id] ? (
                       <CompanyTree
                         details={companyDetails[company.id]}
+                        companyId={company.id}
                         highlightedUserIds={highlightedUserIds}
                         onEditUser={(u) => {
                           setEditUser(u);
                           setNewEmail(u.email);
                           setNewPassword("");
+                          const parts = u.name.split(" ");
+                          setNewLastName(parts[0] || "");
+                          setNewFirstName(parts.slice(1).join(" ") || "");
                         }}
                       />
                     ) : null}
@@ -545,6 +613,35 @@ const AdminDashboard = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Name editing */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <User className="w-3 h-3" /> ФИО
+              </Label>
+              <div className="flex gap-2">
+                <Input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} className="h-9" placeholder="Фамилия" />
+                <Input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} className="h-9" placeholder="Имя" />
+                <Button size="sm" onClick={handleUpdateUserName} disabled={userSaving} className="h-9 shrink-0">
+                  Сохранить
+                </Button>
+              </div>
+            </div>
+
+            {/* Role toggle */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                {editUser?.role === "admin" ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />} Роль
+              </Label>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-mono px-2 py-1 rounded ${editUser?.role === "admin" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                  {editUser?.role === "admin" ? "Администратор" : "Пользователь"}
+                </span>
+                <Button size="sm" variant="outline" onClick={handleToggleRole} disabled={userSaving} className="h-8 text-xs">
+                  {editUser?.role === "admin" ? "Снять админа" : "Назначить админом"}
+                </Button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <Mail className="w-3 h-3" /> Email
@@ -620,12 +717,14 @@ const AdminDashboard = () => {
 // Company tree sub-component
 const CompanyTree = ({
   details,
+  companyId,
   highlightedUserIds,
   onEditUser,
 }: {
   details: CompanyDetails;
+  companyId: string;
   highlightedUserIds: Set<string>;
-  onEditUser: (u: { user_id: string; email: string; name: string }) => void;
+  onEditUser: (u: { user_id: string; email: string; name: string; role: string; company_id: string }) => void;
 }) => {
   const teamMembers = (teamName: string) =>
     details.members.filter((m) => m.profile?.team === teamName);
@@ -647,6 +746,7 @@ const CompanyTree = ({
                 <MemberRow
                   key={m.id}
                   member={m}
+                  companyId={companyId}
                   highlighted={highlightedUserIds.has(m.user_id)}
                   onEdit={onEditUser}
                 />
@@ -669,6 +769,7 @@ const CompanyTree = ({
               <MemberRow
                 key={m.id}
                 member={m}
+                companyId={companyId}
                 highlighted={highlightedUserIds.has(m.user_id)}
                 onEdit={onEditUser}
               />
@@ -682,12 +783,14 @@ const CompanyTree = ({
 
 const MemberRow = ({
   member,
+  companyId,
   highlighted,
   onEdit,
 }: {
   member: CompanyDetails["members"][0];
+  companyId: string;
   highlighted: boolean;
-  onEdit: (u: { user_id: string; email: string; name: string }) => void;
+  onEdit: (u: { user_id: string; email: string; name: string; role: string; company_id: string }) => void;
 }) => {
   const name = `${member.profile?.last_name || ""} ${member.profile?.first_name || ""}`.trim() || "—";
   return (
@@ -716,7 +819,7 @@ const MemberRow = ({
         size="sm"
         variant="ghost"
         className="h-6 w-6 p-0"
-        onClick={() => onEdit({ user_id: member.user_id, email: member.email, name })}
+        onClick={() => onEdit({ user_id: member.user_id, email: member.email, name, role: member.role, company_id: companyId })}
         title="Управление учётными данными"
       >
         <UserCog className="w-3.5 h-3.5" />

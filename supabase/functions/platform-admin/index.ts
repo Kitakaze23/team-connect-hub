@@ -343,6 +343,126 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "update_user_name": {
+        const { target_user_id, first_name, last_name } = params;
+        const { error } = await supabaseAdmin
+          .from("profiles")
+          .update({ first_name, last_name })
+          .eq("user_id", target_user_id);
+
+        if (error) throw error;
+
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_user_id: user.id,
+          action: "update_user_name",
+          target_type: "user",
+          target_id: target_user_id,
+          details: { first_name, last_name },
+        });
+
+        result = { success: true };
+        break;
+      }
+
+      case "set_user_role": {
+        const { target_user_id, company_id, new_role } = params;
+        // Update company_members role
+        const { error: memberError } = await supabaseAdmin
+          .from("company_members")
+          .update({ role: new_role })
+          .eq("user_id", target_user_id)
+          .eq("company_id", company_id);
+
+        if (memberError) throw memberError;
+
+        // Update user_roles
+        const { error: roleError } = await supabaseAdmin
+          .from("user_roles")
+          .update({ role: new_role })
+          .eq("user_id", target_user_id);
+
+        if (roleError) throw roleError;
+
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_user_id: user.id,
+          action: "set_user_role",
+          target_type: "user",
+          target_id: target_user_id,
+          details: { company_id, new_role },
+        });
+
+        result = { success: true };
+        break;
+      }
+
+      case "delete_company": {
+        const { company_id } = params;
+
+        // Delete all related data in order
+        await supabaseAdmin.from("desk_assignments").delete().eq("company_id", company_id);
+        await supabaseAdmin.from("desks").delete().eq("company_id", company_id);
+        await supabaseAdmin.from("work_schedules").delete().eq("company_id", company_id);
+        await supabaseAdmin.from("vacations").delete().eq("company_id", company_id);
+        await supabaseAdmin.from("sick_leaves").delete().eq("company_id", company_id);
+        await supabaseAdmin.from("call_debug_logs").delete().eq("company_id", company_id);
+        await supabaseAdmin.from("call_logs").delete().eq("company_id", company_id);
+
+        // Delete backlog data
+        const { data: bTasks } = await supabaseAdmin.from("backlog_tasks").select("id").eq("company_id", company_id);
+        const taskIds = (bTasks || []).map(t => t.id);
+        if (taskIds.length > 0) {
+          const { data: bStages } = await supabaseAdmin.from("backlog_task_stages").select("id").in("task_id", taskIds);
+          const stageIds = (bStages || []).map(s => s.id);
+          if (stageIds.length > 0) {
+            await supabaseAdmin.from("backlog_stage_links").delete().in("stage_id", stageIds);
+          }
+          await supabaseAdmin.from("backlog_task_stages").delete().in("task_id", taskIds);
+          await supabaseAdmin.from("backlog_task_comments").delete().in("task_id", taskIds);
+          await supabaseAdmin.from("backlog_task_dependencies").delete().in("task_id", taskIds);
+        }
+        await supabaseAdmin.from("backlog_tasks").delete().eq("company_id", company_id);
+        await supabaseAdmin.from("backlog_milestones").delete().eq("company_id", company_id);
+
+        // Delete conversations and messages
+        const { data: convos } = await supabaseAdmin.from("conversations").select("id").eq("company_id", company_id);
+        const convoIds = (convos || []).map(c => c.id);
+        if (convoIds.length > 0) {
+          await supabaseAdmin.from("messages").delete().in("conversation_id", convoIds);
+          await supabaseAdmin.from("conversation_members").delete().in("conversation_id", convoIds);
+        }
+        await supabaseAdmin.from("conversations").delete().eq("company_id", company_id);
+
+        // Delete teams
+        await supabaseAdmin.from("teams").delete().eq("company_id", company_id);
+
+        // Clear profile company_id for members
+        const { data: members } = await supabaseAdmin.from("company_members").select("user_id").eq("company_id", company_id);
+        const memberUserIds = (members || []).map(m => m.user_id);
+        if (memberUserIds.length > 0) {
+          await supabaseAdmin.from("profiles").update({ company_id: null }).in("user_id", memberUserIds);
+          // Reset roles to 'user'
+          await supabaseAdmin.from("user_roles").update({ role: "user" }).in("user_id", memberUserIds);
+        }
+
+        // Delete company members
+        await supabaseAdmin.from("company_members").delete().eq("company_id", company_id);
+
+        // Delete company
+        const { error } = await supabaseAdmin.from("companies").delete().eq("id", company_id);
+        if (error) throw error;
+
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_user_id: user.id,
+          action: "delete_company",
+          target_type: "company",
+          target_id: company_id,
+          details: {},
+        });
+
+        result = { success: true };
+        break;
+      }
+
       case "search": {
         const { query } = params;
         const q = `%${query}%`;

@@ -185,7 +185,8 @@ export default function BacklogView() {
   const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId) || null, [tasks, selectedTaskId]);
   const [editingMilestone, setEditingMilestone] = useState<BacklogMilestone | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-
+  const taskListRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
   const visibleTasks = useMemo(() =>
     showArchive ? tasks.filter(t => t.status === "archived") : tasks.filter(t => t.status !== "archived"),
     [tasks, showArchive]
@@ -356,16 +357,16 @@ export default function BacklogView() {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
-        <h2 className="font-mono font-bold text-foreground text-lg">Бэклог</h2>
+      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card overflow-x-auto">
+        <h2 className="font-mono font-bold text-foreground text-lg shrink-0">Бэклог</h2>
         {currentSprintNumber && (
-          <span className="text-xs font-mono px-2 py-1 rounded bg-secondary text-secondary-foreground">
+          <span className="text-xs font-mono px-2 py-1 rounded bg-secondary text-secondary-foreground shrink-0">
             Спринт #{currentSprintNumber}
           </span>
         )}
-        <div className="flex-1" />
+        <div className="flex-1 min-w-0" />
         <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-36 shrink-0">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -380,6 +381,7 @@ export default function BacklogView() {
           size="sm"
           variant={showArchive ? "default" : "outline"}
           onClick={() => setShowArchive(!showArchive)}
+          className="shrink-0"
         >
           <Archive className="w-4 h-4 mr-1" /> Архив
           {tasks.filter(t => t.status === "archived").length > 0 && (
@@ -388,10 +390,10 @@ export default function BacklogView() {
         </Button>
         {isAdmin && (
           <>
-            <Button size="sm" variant="outline" onClick={() => setCreateMilestoneOpen(true)}>
+            <Button size="sm" variant="outline" onClick={() => setCreateMilestoneOpen(true)} className="shrink-0">
               <Flag className="w-4 h-4 mr-1" /> Отсечка
             </Button>
-            <Button size="sm" onClick={() => setCreateTaskOpen(true)}>
+            <Button size="sm" onClick={() => setCreateTaskOpen(true)} className="shrink-0">
               <Plus className="w-4 h-4 mr-1" /> Задача
             </Button>
           </>
@@ -407,7 +409,19 @@ export default function BacklogView() {
               Задачи
             </div>
           </div>
-          <div className="overflow-y-auto" style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
+          <div
+            ref={taskListRef}
+            className="overflow-y-auto"
+            style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}
+            onScroll={(e) => {
+              if (isSyncingScroll.current) return;
+              isSyncingScroll.current = true;
+              if (scrollRef.current) {
+                scrollRef.current.scrollTop = (e.target as HTMLDivElement).scrollTop;
+              }
+              requestAnimationFrame(() => { isSyncingScroll.current = false; });
+            }}
+          >
             {visibleTasks.map((task, taskIndex) => (
               <React.Fragment key={task.id}>
                 {taskIndex > 0 && (
@@ -464,7 +478,18 @@ export default function BacklogView() {
         </div>
 
         {/* Scrollable timeline */}
-        <div ref={scrollRef} className="flex-1 overflow-auto">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-auto"
+          onScroll={(e) => {
+            if (isSyncingScroll.current) return;
+            isSyncingScroll.current = true;
+            if (taskListRef.current) {
+              taskListRef.current.scrollTop = (e.target as HTMLDivElement).scrollTop;
+            }
+            requestAnimationFrame(() => { isSyncingScroll.current = false; });
+          }}
+        >
           <div style={{ width: totalWidth, minHeight: "100%" }}>
             {/* Date headers */}
             <div className="sticky top-0 z-10 bg-card border-b border-border" style={{ height: HEADER_HEIGHT }}>
