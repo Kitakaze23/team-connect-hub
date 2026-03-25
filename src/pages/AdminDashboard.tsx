@@ -110,12 +110,30 @@ const AdminDashboard = () => {
     });
 
     if (res.error) {
-      if (res.error.message?.includes("403") || res.error.message?.includes("Forbidden")) {
+      const context = (res.error as any)?.context;
+      let detailedMessage = res.error.message;
+
+      if (context) {
+        try {
+          const payload = await context.json();
+          detailedMessage = payload?.error || payload?.message || detailedMessage;
+        } catch {
+          try {
+            const fallbackText = await context.text();
+            if (fallbackText) detailedMessage = fallbackText;
+          } catch {
+            // keep default message
+          }
+        }
+      }
+
+      if (detailedMessage?.includes("403") || detailedMessage?.includes("Forbidden")) {
         await supabase.auth.signOut();
         navigate("/admin");
         return null;
       }
-      throw new Error(res.error.message);
+
+      throw new Error(detailedMessage);
     }
 
     return res.data;
@@ -174,11 +192,24 @@ const AdminDashboard = () => {
 
   const handleCreateCompany = async () => {
     if (!newCompanyName.trim() || !newOwnerEmail.trim() || !newOwnerPassword.trim()) return;
+
+    const normalizedEmail = newOwnerEmail.trim().toLowerCase();
+    const emailRegex = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      toast({
+        title: "Некорректный email",
+        description: "Введите email владельца в формате name@company.com (латиница).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreateSaving(true);
     try {
       await callAdmin("create_company", {
         name: newCompanyName.trim(),
-        owner_email: newOwnerEmail.trim(),
+        owner_email: normalizedEmail,
         owner_password: newOwnerPassword,
       });
       toast({ title: "Компания создана", description: `«${newCompanyName}» успешно создана` });
@@ -189,8 +220,9 @@ const AdminDashboard = () => {
       fetchCompanies();
     } catch (err: any) {
       toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    } finally {
+      setCreateSaving(false);
     }
-    setCreateSaving(false);
   };
 
   const handleSuspendCompany = async (companyId: string) => {
