@@ -34,6 +34,8 @@ import {
   Plus,
   Ban,
   CheckCircle2,
+  Trash2,
+  User,
 } from "lucide-react";
 
 interface Company {
