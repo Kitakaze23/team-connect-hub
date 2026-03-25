@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -118,6 +118,7 @@ Deno.serve(async (req) => {
 
       case "create_company": {
         const { name, owner_email, owner_password } = params;
+        console.log("create_company: starting", { name, owner_email });
 
         // Create user for the owner
         const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
@@ -126,33 +127,50 @@ Deno.serve(async (req) => {
           email_confirm: true,
         });
 
-        if (createUserError) throw createUserError;
+        if (createUserError) {
+          console.error("create_company: createUser failed", createUserError);
+          throw createUserError;
+        }
+
+        const ownerId = newUser.user.id;
+        console.log("create_company: user created", ownerId);
+
+        // Wait for trigger to create profile & role
+        await new Promise((r) => setTimeout(r, 500));
 
         // Create company
         const { data: company, error: companyError } = await supabaseAdmin
           .from("companies")
-          .insert({ name, owner_id: newUser.user.id })
+          .insert({ name, owner_id: ownerId })
           .select()
           .single();
 
-        if (companyError) throw companyError;
+        if (companyError) {
+          console.error("create_company: insert company failed", companyError);
+          throw companyError;
+        }
+
+        console.log("create_company: company created", company.id);
 
         // Add owner as approved admin member
-        await supabaseAdmin
+        const { error: memberError } = await supabaseAdmin
           .from("company_members")
-          .insert({ company_id: company.id, user_id: newUser.user.id, status: "approved", role: "admin" });
+          .insert({ company_id: company.id, user_id: ownerId, status: "approved", role: "admin" });
+        if (memberError) console.error("create_company: member insert failed", memberError);
 
         // Update user_roles to admin
-        await supabaseAdmin
+        const { error: roleError } = await supabaseAdmin
           .from("user_roles")
           .update({ role: "admin" })
-          .eq("user_id", newUser.user.id);
+          .eq("user_id", ownerId);
+        if (roleError) console.error("create_company: role update failed", roleError);
 
         // Update profile with company_id
-        await supabaseAdmin
+        const { error: profileError } = await supabaseAdmin
           .from("profiles")
           .update({ company_id: company.id })
-          .eq("user_id", newUser.user.id);
+          .eq("user_id", ownerId);
+        if (profileError) console.error("create_company: profile update failed", profileError);
 
         // Audit log
         await supabaseAdmin.from("admin_audit_logs").insert({
@@ -163,6 +181,7 @@ Deno.serve(async (req) => {
           details: { name, owner_email },
         });
 
+        console.log("create_company: done");
         result = { success: true, company_id: company.id };
         break;
       }
