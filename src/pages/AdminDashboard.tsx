@@ -781,12 +781,14 @@ const CompanyTree = ({
 
 const MemberRow = ({
   member,
+  companyId,
   highlighted,
   onEdit,
 }: {
   member: CompanyDetails["members"][0];
+  companyId: string;
   highlighted: boolean;
-  onEdit: (u: { user_id: string; email: string; name: string }) => void;
+  onEdit: (u: { user_id: string; email: string; name: string; role: string; company_id: string }) => void;
 }) => {
   const name = `${member.profile?.last_name || ""} ${member.profile?.first_name || ""}`.trim() || "—";
   return (
@@ -815,7 +817,7 @@ const MemberRow = ({
         size="sm"
         variant="ghost"
         className="h-6 w-6 p-0"
-        onClick={() => onEdit({ user_id: member.user_id, email: member.email, name })}
+        onClick={() => onEdit({ user_id: member.user_id, email: member.email, name, role: member.role, company_id: companyId })}
         title="Управление учётными данными"
       >
         <UserCog className="w-3.5 h-3.5" />
