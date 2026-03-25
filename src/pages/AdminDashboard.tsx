@@ -31,12 +31,16 @@ import {
   Mail,
   KeyRound,
   ScrollText,
+  Plus,
+  Ban,
+  CheckCircle2,
 } from "lucide-react";
 
 interface Company {
   id: string;
   name: string;
   created_at: string;
+  status: string;
   member_count: number;
   team_count: number;
 }
@@ -71,6 +75,13 @@ const AdminDashboard = () => {
   const [editCompany, setEditCompany] = useState<Company | null>(null);
   const [editName, setEditName] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+
+  // Create company dialog
+  const [showCreateCompany, setShowCreateCompany] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newOwnerEmail, setNewOwnerEmail] = useState("");
+  const [newOwnerPassword, setNewOwnerPassword] = useState("");
+  const [createSaving, setCreateSaving] = useState(false);
 
   // User management dialog
   const [editUser, setEditUser] = useState<{ user_id: string; email: string; name: string } | null>(null);
@@ -161,13 +172,53 @@ const AdminDashboard = () => {
     setEditSaving(false);
   };
 
+  const handleCreateCompany = async () => {
+    if (!newCompanyName.trim() || !newOwnerEmail.trim() || !newOwnerPassword.trim()) return;
+    setCreateSaving(true);
+    try {
+      await callAdmin("create_company", {
+        name: newCompanyName.trim(),
+        owner_email: newOwnerEmail.trim(),
+        owner_password: newOwnerPassword,
+      });
+      toast({ title: "Компания создана", description: `«${newCompanyName}» успешно создана` });
+      setShowCreateCompany(false);
+      setNewCompanyName("");
+      setNewOwnerEmail("");
+      setNewOwnerPassword("");
+      fetchCompanies();
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+    setCreateSaving(false);
+  };
+
+  const handleSuspendCompany = async (companyId: string) => {
+    try {
+      await callAdmin("suspend_company", { company_id: companyId });
+      toast({ title: "Компания приостановлена" });
+      fetchCompanies();
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleActivateCompany = async (companyId: string) => {
+    try {
+      await callAdmin("activate_company", { company_id: companyId });
+      toast({ title: "Компания активирована" });
+      fetchCompanies();
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+  };
+
   const handleUpdateEmail = async () => {
     if (!editUser || !newEmail.trim()) return;
     setUserSaving(true);
     try {
       await callAdmin("update_user_email", { target_user_id: editUser.user_id, new_email: newEmail.trim() });
       toast({ title: "Email обновлён" });
-      // Refresh details
       const companyIds = Object.keys(companyDetails);
       for (const cid of companyIds) {
         const data = await callAdmin("get_company_details", { company_id: cid });
@@ -217,7 +268,6 @@ const AdminDashboard = () => {
       setHighlightedCompanyIds(companyIds);
       setHighlightedUserIds(userIds);
 
-      // Auto-expand found companies
       for (const cid of companyIds) {
         if (!expandedCompanies.has(cid)) {
           await toggleCompany(cid);
@@ -258,6 +308,10 @@ const AdminDashboard = () => {
           <h1 className="text-sm font-mono font-semibold">Кабинет управляющего</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="default" onClick={() => setShowCreateCompany(true)} className="h-8 gap-1.5">
+            <Plus className="w-3.5 h-3.5" />
+            Создать компанию
+          </Button>
           <Button size="sm" variant="ghost" onClick={handleShowLogs} title="Журнал действий">
             <ScrollText className="w-4 h-4" />
           </Button>
@@ -306,7 +360,7 @@ const AdminDashboard = () => {
               key={company.id}
               className={`bg-card border rounded-xl overflow-hidden transition-colors ${
                 highlightedCompanyIds.has(company.id) ? "border-primary ring-1 ring-primary/30" : "border-border"
-              }`}
+              } ${company.status === "suspended" ? "opacity-70" : ""}`}
             >
               <Collapsible open={expandedCompanies.has(company.id)}>
                 <div className="flex items-center gap-3 p-4">
@@ -326,23 +380,53 @@ const AdminDashboard = () => {
                   </CollapsibleTrigger>
                   <Building2 className="w-4 h-4 text-muted-foreground" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{company.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{company.name}</p>
+                      {company.status === "suspended" && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-mono">
+                          Приостановлена
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {new Date(company.created_at).toLocaleDateString("ru")} · {company.member_count} чел. · {company.team_count} команд
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0"
-                    onClick={() => {
-                      setEditCompany(company);
-                      setEditName(company.name);
-                    }}
-                    title="Изменить название"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {company.status === "suspended" ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        onClick={() => handleActivateCompany(company.id)}
+                        title="Активировать компанию"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        onClick={() => handleSuspendCompany(company.id)}
+                        title="Приостановить компанию"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        setEditCompany(company);
+                        setEditName(company.name);
+                      }}
+                      title="Изменить название"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
                 <CollapsibleContent>
@@ -373,6 +457,37 @@ const AdminDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Create company dialog */}
+      <Dialog open={showCreateCompany} onOpenChange={setShowCreateCompany}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-mono flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Создать компанию
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Название компании</Label>
+              <Input value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} className="h-9" placeholder="Моя компания" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email владельца</Label>
+              <Input value={newOwnerEmail} onChange={(e) => setNewOwnerEmail(e.target.value)} className="h-9" placeholder="owner@company.com" type="email" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Пароль владельца</Label>
+              <Input value={newOwnerPassword} onChange={(e) => setNewOwnerPassword(e.target.value)} className="h-9" placeholder="Минимум 6 символов" type="password" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button size="sm" onClick={handleCreateCompany} disabled={createSaving || !newCompanyName.trim() || !newOwnerEmail.trim() || !newOwnerPassword.trim()}>
+              {createSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+              Создать
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit company name dialog */}
       <Dialog open={!!editCompany} onOpenChange={(o) => !o && setEditCompany(null)}>

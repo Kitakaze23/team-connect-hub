@@ -7,6 +7,7 @@ interface CompanyMembership {
   company_name: string;
   role: "admin" | "user";
   status: "pending" | "approved" | "rejected";
+  company_status?: "active" | "suspended";
 }
 
 interface AuthContextType {
@@ -57,10 +58,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Fetch company name
+      // Fetch company name and status
       const { data: company } = await supabase
         .from("companies")
-        .select("name")
+        .select("name, status")
         .eq("id", data.company_id)
         .maybeSingle();
 
@@ -69,6 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         company_name: company?.name || "",
         role: data.role as "admin" | "user",
         status: data.status as "pending" | "approved" | "rejected",
+        company_status: (company?.status as "active" | "suspended") || "active",
       });
     } catch {
       setMembership(null);

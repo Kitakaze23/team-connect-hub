@@ -30,6 +30,13 @@ const Dashboard = () => {
 
   const isAdmin = membership?.role === "admin";
 
+  // Request notification permission for call alerts
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
   useEffect(() => {
     if (!membership?.company_id) return;
     supabase.from("companies").select("backlog_enabled").eq("id", membership.company_id).single().then(({ data }) => {
