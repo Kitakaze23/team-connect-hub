@@ -409,7 +409,19 @@ export default function BacklogView() {
               Задачи
             </div>
           </div>
-          <div className="overflow-y-auto" style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
+          <div
+            ref={taskListRef}
+            className="overflow-y-auto"
+            style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}
+            onScroll={(e) => {
+              if (isSyncingScroll.current) return;
+              isSyncingScroll.current = true;
+              if (scrollRef.current) {
+                scrollRef.current.scrollTop = (e.target as HTMLDivElement).scrollTop;
+              }
+              requestAnimationFrame(() => { isSyncingScroll.current = false; });
+            }}
+          >
             {visibleTasks.map((task, taskIndex) => (
               <React.Fragment key={task.id}>
                 {taskIndex > 0 && (
