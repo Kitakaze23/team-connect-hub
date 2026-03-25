@@ -715,12 +715,14 @@ const AdminDashboard = () => {
 // Company tree sub-component
 const CompanyTree = ({
   details,
+  companyId,
   highlightedUserIds,
   onEditUser,
 }: {
   details: CompanyDetails;
+  companyId: string;
   highlightedUserIds: Set<string>;
-  onEditUser: (u: { user_id: string; email: string; name: string }) => void;
+  onEditUser: (u: { user_id: string; email: string; name: string; role: string; company_id: string }) => void;
 }) => {
   const teamMembers = (teamName: string) =>
     details.members.filter((m) => m.profile?.team === teamName);
