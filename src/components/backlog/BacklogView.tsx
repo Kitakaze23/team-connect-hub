@@ -478,7 +478,18 @@ export default function BacklogView() {
         </div>
 
         {/* Scrollable timeline */}
-        <div ref={scrollRef} className="flex-1 overflow-auto">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-auto"
+          onScroll={(e) => {
+            if (isSyncingScroll.current) return;
+            isSyncingScroll.current = true;
+            if (taskListRef.current) {
+              taskListRef.current.scrollTop = (e.target as HTMLDivElement).scrollTop;
+            }
+            requestAnimationFrame(() => { isSyncingScroll.current = false; });
+          }}
+        >
           <div style={{ width: totalWidth, minHeight: "100%" }}>
             {/* Date headers */}
             <div className="sticky top-0 z-10 bg-card border-b border-border" style={{ height: HEADER_HEIGHT }}>
