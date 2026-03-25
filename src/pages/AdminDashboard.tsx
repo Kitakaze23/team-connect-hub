@@ -611,6 +611,35 @@ const AdminDashboard = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Name editing */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <User className="w-3 h-3" /> ФИО
+              </Label>
+              <div className="flex gap-2">
+                <Input value={newLastName} onChange={(e) => setNewLastName(e.target.value)} className="h-9" placeholder="Фамилия" />
+                <Input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} className="h-9" placeholder="Имя" />
+                <Button size="sm" onClick={handleUpdateUserName} disabled={userSaving} className="h-9 shrink-0">
+                  Сохранить
+                </Button>
+              </div>
+            </div>
+
+            {/* Role toggle */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                {editUser?.role === "admin" ? <ShieldCheck className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />} Роль
+              </Label>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-mono px-2 py-1 rounded ${editUser?.role === "admin" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                  {editUser?.role === "admin" ? "Администратор" : "Пользователь"}
+                </span>
+                <Button size="sm" variant="outline" onClick={handleToggleRole} disabled={userSaving} className="h-8 text-xs">
+                  {editUser?.role === "admin" ? "Снять админа" : "Назначить админом"}
+                </Button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <Mail className="w-3 h-3" /> Email
