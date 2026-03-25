@@ -7,6 +7,7 @@ interface CompanyMembership {
   company_name: string;
   role: "admin" | "user";
   status: "pending" | "approved" | "rejected";
+  company_status?: "active" | "suspended";
 }
 
 interface AuthContextType {
