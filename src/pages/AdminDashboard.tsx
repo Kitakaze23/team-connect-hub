@@ -532,11 +532,15 @@ const AdminDashboard = () => {
                     ) : companyDetails[company.id] ? (
                       <CompanyTree
                         details={companyDetails[company.id]}
+                        companyId={company.id}
                         highlightedUserIds={highlightedUserIds}
                         onEditUser={(u) => {
                           setEditUser(u);
                           setNewEmail(u.email);
                           setNewPassword("");
+                          const parts = u.name.split(" ");
+                          setNewLastName(parts[0] || "");
+                          setNewFirstName(parts.slice(1).join(" ") || "");
                         }}
                       />
                     ) : null}
