@@ -247,6 +247,57 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteCompany = async (companyId: string, companyName: string) => {
+    if (!window.confirm(`Вы уверены, что хотите удалить компанию «${companyName}»? Все данные будут потеряны.`)) return;
+    try {
+      await callAdmin("delete_company", { company_id: companyId });
+      toast({ title: "Компания удалена" });
+      setCompanyDetails((prev) => { const n = { ...prev }; delete n[companyId]; return n; });
+      fetchCompanies();
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleUpdateUserName = async () => {
+    if (!editUser || !newFirstName.trim()) return;
+    setUserSaving(true);
+    try {
+      await callAdmin("update_user_name", { target_user_id: editUser.user_id, first_name: newFirstName.trim(), last_name: newLastName.trim() });
+      toast({ title: "ФИО обновлено" });
+      // Refresh details
+      const companyIds = Object.keys(companyDetails);
+      for (const cid of companyIds) {
+        const data = await callAdmin("get_company_details", { company_id: cid });
+        if (data) setCompanyDetails((prev) => ({ ...prev, [cid]: data }));
+      }
+      setEditUser((prev) => prev ? { ...prev, name: `${newLastName.trim()} ${newFirstName.trim()}`.trim() } : null);
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+    setUserSaving(false);
+  };
+
+  const handleToggleRole = async () => {
+    if (!editUser) return;
+    const newRole = editUser.role === "admin" ? "user" : "admin";
+    setUserSaving(true);
+    try {
+      await callAdmin("set_user_role", { target_user_id: editUser.user_id, company_id: editUser.company_id, new_role: newRole });
+      toast({ title: newRole === "admin" ? "Назначен администратором" : "Роль изменена на пользователя" });
+      setEditUser((prev) => prev ? { ...prev, role: newRole } : null);
+      // Refresh details
+      const companyIds = Object.keys(companyDetails);
+      for (const cid of companyIds) {
+        const data = await callAdmin("get_company_details", { company_id: cid });
+        if (data) setCompanyDetails((prev) => ({ ...prev, [cid]: data }));
+      }
+    } catch (err: any) {
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+    setUserSaving(false);
+  };
+
   const handleUpdateEmail = async () => {
     if (!editUser || !newEmail.trim()) return;
     setUserSaving(true);
