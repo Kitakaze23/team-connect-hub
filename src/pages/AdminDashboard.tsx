@@ -511,6 +511,15 @@ const AdminDashboard = () => {
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteCompany(company.id, company.name)}
+                      title="Удалить компанию"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
 
