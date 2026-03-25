@@ -13,7 +13,38 @@ import PendingApproval from "./pages/PendingApproval";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
-import { Loader2 } from "lucide-react";
+import { Loader2, Terminal, ShieldBan, LogOut } from "lucide-react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+
+const CompanySuspended = ({ companyName, onSignOut }: { companyName: string; onSignOut: () => void }) => (
+  <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-md text-center"
+    >
+      <div className="inline-flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+          <Terminal className="w-6 h-6 text-primary-foreground" />
+        </div>
+        <h1 className="text-3xl font-mono font-bold text-foreground tracking-tight">Терминал</h1>
+      </div>
+      <div className="glass rounded-2xl p-8 shadow-lg">
+        <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-destructive/10">
+          <ShieldBan className="w-8 h-8 text-destructive" />
+        </div>
+        <h2 className="text-lg font-mono font-bold text-foreground mb-2">Аккаунт заблокирован</h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Аккаунт компании «{companyName}» временно заблокирован. Обратитесь к администратору платформы для получения информации.
+        </p>
+        <Button onClick={onSignOut} variant="outline" className="rounded-xl">
+          <LogOut className="w-4 h-4 mr-2" /> Выйти
+        </Button>
+      </div>
+    </motion.div>
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
