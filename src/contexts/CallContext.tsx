@@ -349,6 +349,25 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCaller({ userId: payload.callerId, name: payload.callerName, avatarUrl: payload.callerAvatar });
       setParticipants(payload.participants || []);
 
+      // Browser notification when tab is in background
+      if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+        const callLabel = payload.callType === "video" ? "Видеозвонок" : "Аудиозвонок";
+        const notification = new Notification(`${callLabel} от ${payload.callerName}`, {
+          body: "Нажмите, чтобы ответить",
+          icon: payload.callerAvatar || undefined,
+          tag: "incoming-call",
+          requireInteraction: true,
+        });
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+        // Auto-close after ring timeout
+        setTimeout(() => notification.close(), 30000);
+      } else if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+
       await setupSignalingChannel(payload.conversationId);
 
       ringTimeoutRef.current = setTimeout(() => {
