@@ -63,6 +63,14 @@ const AppRoutes = () => {
     );
   }
 
+  if (membership.company_status === "suspended") {
+    return (
+      <Routes>
+        <Route path="*" element={<CompanySuspended companyName={membership.company_name} onSignOut={signOut} />} />
+      </Routes>
+    );
+  }
+
   if (membership.status !== "approved") {
     return (
       <Routes>
