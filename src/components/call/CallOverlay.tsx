@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Phone, PhoneOff, Video, Mic, MicOff, VideoOff, X } from "lucide-react";
+import { Phone, PhoneOff, Video, Mic, MicOff, VideoOff } from "lucide-react";
 import { useCall } from "@/contexts/CallContext";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 const formatDuration = (s: number) => {
   const m = Math.floor(s / 60);
@@ -11,39 +11,74 @@ const formatDuration = (s: number) => {
 
 const CallOverlay = () => {
   const {
-    callState, callType, isGroupCall, participants, caller, callDuration,
+    callState, callType, participants, caller, callDuration,
     localStream, remoteStreams, isMuted, isCameraOff,
     acceptCall, rejectCall, endCall, toggleMute, toggleCamera,
   } = useCall();
 
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  // Use callback refs so we re-attach whenever the DOM element changes (e.g. outgoing→active)
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  const attachMediaStream = (element: HTMLMediaElement | null, stream: MediaStream | null) => {
-    if (!element) return;
-
-    if (!stream) {
-      element.srcObject = null;
-      return;
-    }
-
-    if (element.srcObject !== stream) {
-      element.srcObject = stream;
-    }
-
-    void element.play().catch(() => {
-      // autoplay can be blocked by browser policy; user action will allow playback
-    });
+  const attachStream = (el: HTMLMediaElement | null, stream: MediaStream | null) => {
+    if (!el) return;
+    if (!stream) { el.srcObject = null; return; }
+    if (el.srcObject !== stream) el.srcObject = stream;
+    el.play().catch(() => {});
   };
 
-  useEffect(() => {
-    attachMediaStream(localVideoRef.current, localStream);
+  // Callback ref for local video — fires every time the <video> mounts/unmounts
+  const setLocalVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    localVideoRef.current = node;
+    attachStream(node, localStream);
   }, [localStream]);
 
+  // Re-attach when localStream changes on existing element
   useEffect(() => {
-    const firstStream = remoteStreams.values().next().value ?? null;
-    attachMediaStream(remoteVideoRef.current, firstStream);
-  }, [remoteStreams]);
+    attachStream(localVideoRef.current, localStream);
+  }, [localStream]);
+
+  // Callback ref for remote video
+  const firstRemoteStream = remoteStreams.size > 0
+    ? remoteStreams.values().next().value ?? null
+    : null;
+
+  const setRemoteVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    remoteVideoRef.current = node;
+    attachStream(node, firstRemoteStream);
+  }, [firstRemoteStream]);
+
+  // Re-attach when remoteStreams change on existing element
+  useEffect(() => {
+    attachStream(remoteVideoRef.current, firstRemoteStream);
+  }, [firstRemoteStream]);
+
+  // Also re-attach when tracks inside the stream change (track added/removed/ended)
+  useEffect(() => {
+    if (!firstRemoteStream) return;
+    const handler = () => {
+      attachStream(remoteVideoRef.current, firstRemoteStream);
+    };
+    firstRemoteStream.addEventListener("addtrack", handler);
+    firstRemoteStream.addEventListener("removetrack", handler);
+    return () => {
+      firstRemoteStream.removeEventListener("addtrack", handler);
+      firstRemoteStream.removeEventListener("removetrack", handler);
+    };
+  }, [firstRemoteStream]);
+
+  useEffect(() => {
+    if (!localStream) return;
+    const handler = () => {
+      attachStream(localVideoRef.current, localStream);
+    };
+    localStream.addEventListener("addtrack", handler);
+    localStream.addEventListener("removetrack", handler);
+    return () => {
+      localStream.removeEventListener("addtrack", handler);
+      localStream.removeEventListener("removetrack", handler);
+    };
+  }, [localStream]);
 
   if (callState === "idle") return null;
 
@@ -55,6 +90,10 @@ const CallOverlay = () => {
     : participants[0]?.avatarUrl;
   const initials = targetName.split(" ").map(n => n[0]).join("").slice(0, 2);
 
+  const attachMediaStream = (node: HTMLMediaElement | null, stream: MediaStream | null) => {
+    attachStream(node, stream);
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -63,7 +102,6 @@ const CallOverlay = () => {
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[9999] flex items-center justify-center"
       >
-        {/* Backdrop */}
         <div className="absolute inset-0 bg-background/95 backdrop-blur-xl" />
 
         <div className="relative z-10 flex flex-col items-center w-full max-w-lg mx-auto px-6">
@@ -143,7 +181,7 @@ const CallOverlay = () => {
 
               {callType === "video" && localStream && (
                 <div className="relative w-56 aspect-video rounded-xl overflow-hidden border border-border bg-secondary">
-                  <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                  <video ref={setLocalVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                   {isCameraOff && (
                     <div className="absolute inset-0 bg-secondary flex items-center justify-center">
                       <VideoOff className="w-5 h-5 text-muted-foreground" />
@@ -166,11 +204,10 @@ const CallOverlay = () => {
               animate={{ scale: 1, opacity: 1 }}
               className="flex flex-col items-center w-full gap-4"
             >
-              {/* Video area */}
               {callType === "video" ? (
                 <div className="relative w-full aspect-video bg-secondary rounded-2xl overflow-hidden">
-                  {remoteStreams.size > 0 ? (
-                    <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                  {firstRemoteStream ? (
+                    <video ref={setRemoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
@@ -182,10 +219,9 @@ const CallOverlay = () => {
                       </div>
                     </div>
                   )}
-                  {/* PiP local video */}
                   {localStream && (
                     <div className="absolute bottom-3 right-3 w-32 aspect-video rounded-xl overflow-hidden border-2 border-border shadow-lg">
-                      <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                      <video ref={setLocalVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                       {isCameraOff && (
                         <div className="absolute inset-0 bg-secondary flex items-center justify-center">
                           <VideoOff className="w-5 h-5 text-muted-foreground" />
@@ -195,7 +231,6 @@ const CallOverlay = () => {
                   )}
                 </div>
               ) : (
-                /* Audio call */
                 <div className="flex flex-col items-center gap-4 py-12">
                   <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
                     {targetAvatar ? (
@@ -208,12 +243,10 @@ const CallOverlay = () => {
                 </div>
               )}
 
-              {/* Timer */}
               <div className="text-sm font-mono text-muted-foreground">
                 {formatDuration(callDuration)}
               </div>
 
-              {/* Controls */}
               <div className="flex gap-4 mt-2">
                 <button onClick={toggleMute}
                   className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
@@ -237,18 +270,16 @@ const CallOverlay = () => {
             </motion.div>
           )}
 
+          {/* Hidden audio elements for remote streams */}
           {Array.from(remoteStreams.entries()).map(([participantId, stream], index) => {
             if (callType === "video" && index === 0) return null;
-
             return (
               <audio
                 key={participantId}
                 autoPlay
                 playsInline
                 className="hidden"
-                ref={(node) => {
-                  attachMediaStream(node, stream);
-                }}
+                ref={(node) => { attachMediaStream(node, stream); }}
               />
             );
           })}
