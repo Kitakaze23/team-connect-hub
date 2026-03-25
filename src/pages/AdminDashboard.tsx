@@ -84,9 +84,11 @@ const AdminDashboard = () => {
   const [createSaving, setCreateSaving] = useState(false);
 
   // User management dialog
-  const [editUser, setEditUser] = useState<{ user_id: string; email: string; name: string } | null>(null);
+  const [editUser, setEditUser] = useState<{ user_id: string; email: string; name: string; role: string; company_id: string } | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
   const [userSaving, setUserSaving] = useState(false);
 
   // Audit logs
