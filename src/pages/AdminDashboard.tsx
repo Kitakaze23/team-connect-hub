@@ -744,6 +744,7 @@ const CompanyTree = ({
                 <MemberRow
                   key={m.id}
                   member={m}
+                  companyId={companyId}
                   highlighted={highlightedUserIds.has(m.user_id)}
                   onEdit={onEditUser}
                 />
