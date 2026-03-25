@@ -185,7 +185,8 @@ export default function BacklogView() {
   const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId) || null, [tasks, selectedTaskId]);
   const [editingMilestone, setEditingMilestone] = useState<BacklogMilestone | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-
+  const taskListRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
   const visibleTasks = useMemo(() =>
     showArchive ? tasks.filter(t => t.status === "archived") : tasks.filter(t => t.status !== "archived"),
     [tasks, showArchive]
