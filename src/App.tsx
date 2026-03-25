@@ -24,7 +24,7 @@ const queryClient = new QueryClient({
 });
 
 const AppRoutes = () => {
-  const { user, loading, membership, membershipLoading, isPlatformAdmin } = useAuth();
+  const { user, loading, membership, membershipLoading, isPlatformAdmin, signOut } = useAuth();
   const isInitialMembershipLoad = Boolean(user) && !isPlatformAdmin && !membership && membershipLoading;
 
   if (loading || isInitialMembershipLoad) {
