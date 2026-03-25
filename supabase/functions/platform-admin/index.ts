@@ -118,22 +118,43 @@ Deno.serve(async (req) => {
 
       case "create_company": {
         const { name, owner_email, owner_password } = params;
-        console.log("create_company: starting", { name, owner_email });
+
+        const normalizedEmail = String(owner_email || "").trim().toLowerCase();
+        const normalizedName = String(name || "").trim();
+        const normalizedPassword = String(owner_password || "");
+        const emailRegex = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+
+        if (!normalizedName) {
+          return new Response(JSON.stringify({ error: "Название компании обязательно" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!emailRegex.test(normalizedEmail)) {
+          return new Response(JSON.stringify({ error: "Некорректный email владельца. Используйте формат name@company.com (латиница)." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (normalizedPassword.length < 6) {
+          return new Response(JSON.stringify({ error: "Пароль владельца должен быть минимум 6 символов" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
 
         // Create user for the owner
         const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-          email: owner_email,
-          password: owner_password,
+          email: normalizedEmail,
+          password: normalizedPassword,
           email_confirm: true,
         });
 
-        if (createUserError) {
-          console.error("create_company: createUser failed", createUserError);
-          throw createUserError;
-        }
+        if (createUserError) throw createUserError;
 
         const ownerId = newUser.user.id;
-        console.log("create_company: user created", ownerId);
 
         // Wait for trigger to create profile & role
         await new Promise((r) => setTimeout(r, 500));
@@ -141,36 +162,28 @@ Deno.serve(async (req) => {
         // Create company
         const { data: company, error: companyError } = await supabaseAdmin
           .from("companies")
-          .insert({ name, owner_id: ownerId })
+          .insert({ name: normalizedName, owner_id: ownerId })
           .select()
           .single();
 
-        if (companyError) {
-          console.error("create_company: insert company failed", companyError);
-          throw companyError;
-        }
-
-        console.log("create_company: company created", company.id);
+        if (companyError) throw companyError;
 
         // Add owner as approved admin member
-        const { error: memberError } = await supabaseAdmin
+        await supabaseAdmin
           .from("company_members")
           .insert({ company_id: company.id, user_id: ownerId, status: "approved", role: "admin" });
-        if (memberError) console.error("create_company: member insert failed", memberError);
 
         // Update user_roles to admin
-        const { error: roleError } = await supabaseAdmin
+        await supabaseAdmin
           .from("user_roles")
           .update({ role: "admin" })
           .eq("user_id", ownerId);
-        if (roleError) console.error("create_company: role update failed", roleError);
 
         // Update profile with company_id
-        const { error: profileError } = await supabaseAdmin
+        await supabaseAdmin
           .from("profiles")
           .update({ company_id: company.id })
           .eq("user_id", ownerId);
-        if (profileError) console.error("create_company: profile update failed", profileError);
 
         // Audit log
         await supabaseAdmin.from("admin_audit_logs").insert({
@@ -178,10 +191,9 @@ Deno.serve(async (req) => {
           action: "create_company",
           target_type: "company",
           target_id: company.id,
-          details: { name, owner_email },
+          details: { name: normalizedName, owner_email: normalizedEmail },
         });
 
-        console.log("create_company: done");
         result = { success: true, company_id: company.id };
         break;
       }
