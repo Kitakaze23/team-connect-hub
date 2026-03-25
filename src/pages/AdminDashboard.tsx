@@ -630,7 +630,7 @@ const AdminDashboard = () => {
             {/* Role toggle */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                {editUser?.role === "admin" ? <ShieldCheck className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />} Роль
+                {editUser?.role === "admin" ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />} Роль
               </Label>
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-mono px-2 py-1 rounded ${editUser?.role === "admin" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
