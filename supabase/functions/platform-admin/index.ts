@@ -158,11 +158,12 @@ Deno.serve(async (req) => {
           .insert({ company_id: company.id, user_id: ownerId, status: "approved", role: "admin" });
         if (memberError) console.error("create_company: member insert failed", memberError);
 
-        // Update user_roles to admin (upsert in case trigger hasn't run yet)
+        // Update user_roles to admin
         const { error: roleError } = await supabaseAdmin
           .from("user_roles")
-          .upsert({ user_id: ownerId, role: "admin" }, { onConflict: "user_id" });
-        if (roleError) console.error("create_company: role upsert failed", roleError);
+          .update({ role: "admin" })
+          .eq("user_id", ownerId);
+        if (roleError) console.error("create_company: role update failed", roleError);
 
         // Update profile with company_id
         const { error: profileError } = await supabaseAdmin
