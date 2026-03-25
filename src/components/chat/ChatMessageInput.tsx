@@ -88,7 +88,7 @@ const ChatMessageInput = ({ conversationId, onMessageSent }: ChatMessageInputPro
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Написать сообщение..."
-          className="flex-1 bg-secondary rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-accent/30 transition-all"
+          className="flex-1 bg-secondary rounded-xl px-4 py-2.5 text-base md:text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-accent/30 transition-all"
         />
         <button type="submit" disabled={(!newMessage.trim() && !preview) || uploading}
           className="w-10 h-10 rounded-xl bg-accent text-accent-foreground flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0">
