@@ -45,6 +45,9 @@ export const useCall = () => {
 // ── Heartbeat interval (ms) ──
 const HEARTBEAT_INTERVAL = 5_000;
 const HEARTBEAT_TIMEOUT = 15_000;
+const SIGNAL_SEND_RETRIES = 3;
+const SIGNAL_RETRY_BASE_MS = 250;
+const MAX_SIGNALING_RECONNECT_ATTEMPTS = 5;
 
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, membership } = useAuth();
@@ -67,11 +70,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const lastHeartbeatRef = useRef<number>(0);
   const heartbeatCheckRef = useRef<NodeJS.Timeout | null>(null);
+  const signalingReconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const signalingReconnectAttemptsRef = useRef(0);
+  const signalingReconnectInProgressRef = useRef(false);
 
   const processedSignalsRef = useRef<Set<string>>(new Set());
   const callRoleRef = useRef<"caller" | "callee" | null>(null);
-  // Guard: has the caller already sent the initial offer for this session?
-  const offerSentRef = useRef(false);
 
   // Wire logger
   useEffect(() => { webrtc.setLogger(logger.log); }, [webrtc.setLogger, logger.log]);
@@ -85,6 +89,38 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearRingTimeout = useCallback(() => {
     if (ringTimeoutRef.current) { clearTimeout(ringTimeoutRef.current); ringTimeoutRef.current = null; }
   }, []);
+
+  const clearSignalingReconnectTimer = useCallback(() => {
+    if (signalingReconnectTimerRef.current) {
+      clearTimeout(signalingReconnectTimerRef.current);
+      signalingReconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const sendCallSignal = useCallback(async (
+    channel: ReturnType<typeof supabase.channel>,
+    payload: Record<string, any>,
+    attempt = 1,
+  ): Promise<boolean> => {
+    try {
+      const result = await channel.send({ type: "broadcast", event: "call-signal", payload });
+      const ok = result === "ok" || result === undefined;
+      if (ok) return true;
+      if (attempt >= SIGNAL_SEND_RETRIES) {
+        logger.log("signal_send_failed", { type: payload.type, result, attempt });
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, SIGNAL_RETRY_BASE_MS * attempt));
+      return sendCallSignal(channel, payload, attempt + 1);
+    } catch (e: any) {
+      if (attempt >= SIGNAL_SEND_RETRIES) {
+        logger.log("signal_send_error", { type: payload.type, error: e?.message, attempt });
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, SIGNAL_RETRY_BASE_MS * attempt));
+      return sendCallSignal(channel, payload, attempt + 1);
+    }
+  }, [logger]);
 
   // ── Duration timer ──
   useEffect(() => {
@@ -108,10 +144,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     lastHeartbeatRef.current = Date.now();
 
     heartbeatRef.current = setInterval(() => {
-      channel.send({
-        type: "broadcast", event: "call-signal",
-        payload: { type: "heartbeat", fromUserId: myId, targetUserId: "__all__" },
-      });
+      void sendCallSignal(channel, { type: "heartbeat", fromUserId: myId, targetUserId: "__all__" });
     }, HEARTBEAT_INTERVAL);
 
     heartbeatCheckRef.current = setInterval(() => {
@@ -122,7 +155,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Don't kill call immediately — ICE restart will handle recovery
       }
     }, HEARTBEAT_INTERVAL);
-  }, [stopHeartbeat, logger]);
+  }, [stopHeartbeat, logger, sendCallSignal]);
 
   // ── Cleanup ──
   const cleanupCall = useCallback(() => {
@@ -130,6 +163,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
     clearRingTimeout();
     stopHeartbeat();
+    clearSignalingReconnectTimer();
+    signalingReconnectAttemptsRef.current = 0;
+    signalingReconnectInProgressRef.current = false;
     webrtc.cleanup();
     setCallStateTracked("idle");
     setParticipants([]);
@@ -138,20 +174,21 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCallDuration(0);
     setCallLogId(null);
     callRoleRef.current = null;
-    offerSentRef.current = false;
     processedSignalsRef.current.clear();
     logger.reset();
-  }, [webrtc, clearRingTimeout, stopHeartbeat, logger, setCallStateTracked]);
+  }, [webrtc, clearRingTimeout, stopHeartbeat, logger, setCallStateTracked, clearSignalingReconnectTimer]);
 
   // ── ICE sender factory ──
   const makeIceSender = useCallback((channel: ReturnType<typeof supabase.channel>, fromUserId: string, targetUserId: string) => {
     return (candidate: RTCIceCandidate) => {
-      channel.send({
-        type: "broadcast", event: "call-signal",
-        payload: { type: "ice-candidate", candidate: candidate.toJSON(), fromUserId, targetUserId },
+      void sendCallSignal(channel, {
+        type: "ice-candidate",
+        candidate: candidate.toJSON(),
+        fromUserId,
+        targetUserId,
       });
     };
-  }, []);
+  }, [sendCallSignal]);
 
   const handleConnectionLost = useCallback(() => {
     if (callStateRef.current === "active") {
@@ -161,32 +198,32 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cleanupCall, logger]);
 
-  // ── ICE restart (caller only) ──
-  const handleIceRestartRequest = useCallback((remoteUserId: string) => {
-    if (callRoleRef.current !== "caller") return;
+  const handleOutgoingOffer = useCallback(async (
+    remoteUserId: string,
+    offer: RTCSessionDescriptionInit,
+    meta: { iceRestart: boolean },
+  ) => {
     const channel = channelRef.current;
     if (!channel || !user) return;
 
-    logger.log("ice_restart_offer", { remoteUserId });
+    await sendCallSignal(channel, {
+      type: "offer",
+      sdp: offer,
+      fromUserId: user.id,
+      targetUserId: remoteUserId,
+      iceRestart: meta.iceRestart,
+      signalId: `offer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    });
 
-    (async () => {
-      try {
-        const offer = await webrtc.createOffer(remoteUserId, makeIceSender(channel, user.id, remoteUserId), handleConnectionLost, true);
-        if (!offer) return;
-        channel.send({
-          type: "broadcast", event: "call-signal",
-          payload: { type: "offer", sdp: offer, fromUserId: user.id, targetUserId: remoteUserId, signalId: `restart-${Date.now()}` },
-        });
-      } catch (e: any) {
-        logger.log("ice_restart_error", { error: e?.message });
-      }
-    })();
-  }, [user, webrtc, makeIceSender, handleConnectionLost, logger]);
+    logger.log("offer_sent", { to: remoteUserId, iceRestart: meta.iceRestart });
+  }, [sendCallSignal, user, logger]);
 
-  useEffect(() => { webrtc.setIceRestartHandler(handleIceRestartRequest); }, [webrtc.setIceRestartHandler, handleIceRestartRequest]);
+  useEffect(() => {
+    webrtc.setOfferHandler(handleOutgoingOffer);
+  }, [webrtc.setOfferHandler, handleOutgoingOffer]);
 
   // ── Signaling channel ──
-  const setupSignalingChannel = useCallback((convId: string) => {
+  const setupSignalingChannel = useCallback((convId: string, isReconnect = false) => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     const channel = supabase.channel(`call-${convId}`, { config: { broadcast: { self: false } } });
@@ -200,8 +237,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Must be targeted at us
-      if (payload.targetUserId !== user.id) return;
+      // Must be targeted at us (or broadcast to all)
+      if (payload.targetUserId !== user.id && payload.targetUserId !== "__all__") return;
 
       // Deduplicate non-ICE signals
       const signalId = payload.signalId;
@@ -213,37 +250,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.log("signal_in", { type: payload.type, from: payload.fromUserId, role: callRoleRef.current });
 
       switch (payload.type) {
-        // ── ACCEPT: callee accepted → caller creates THE ONLY initial offer ──
+        // ── ACCEPT: callee accepted → caller ensures PC; offer will be created by onnegotiationneeded ──
         case "accept": {
           if (callRoleRef.current !== "caller") break;
-          // Guard: only one initial offer per call session
-          if (offerSentRef.current) {
-            logger.log("offer_already_sent_skipping");
-            break;
-          }
-          offerSentRef.current = true;
-
-          logger.log("creating_offer_after_accept", { callee: payload.fromUserId });
-          try {
-            const offer = await webrtc.createOffer(
-              payload.fromUserId,
-              makeIceSender(channel, user.id, payload.fromUserId),
-              handleConnectionLost,
-            );
-            if (!offer) {
-              logger.log("offer_creation_failed");
-              offerSentRef.current = false; // allow retry
-              break;
-            }
-            channel.send({
-              type: "broadcast", event: "call-signal",
-              payload: { type: "offer", sdp: offer, fromUserId: user.id, targetUserId: payload.fromUserId, signalId: `offer-${Date.now()}` },
-            });
-            logger.log("offer_sent", { callee: payload.fromUserId });
-          } catch (e: any) {
-            logger.log("offer_error", { error: e?.message });
-            offerSentRef.current = false;
-          }
+          webrtc.ensurePeerConnection(
+            payload.fromUserId,
+            makeIceSender(channel, user.id, payload.fromUserId),
+            handleConnectionLost,
+          );
+          logger.log("peer_ready_after_accept", { callee: payload.fromUserId });
           break;
         }
 
@@ -260,9 +275,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
               handleConnectionLost,
             );
             if (!answer) { logger.log("answer_creation_failed"); break; }
-            channel.send({
-              type: "broadcast", event: "call-signal",
-              payload: { type: "answer", sdp: answer, fromUserId: user.id, targetUserId: payload.fromUserId, signalId: `answer-${Date.now()}` },
+            await sendCallSignal(channel, {
+              type: "answer",
+              sdp: answer,
+              fromUserId: user.id,
+              targetUserId: payload.fromUserId,
+              signalId: `answer-${Date.now()}`,
             });
             logger.log("answer_sent", { to: payload.fromUserId });
             clearRingTimeout();
@@ -294,6 +312,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         }
 
+        case "renegotiate-request": {
+          if (callRoleRef.current === "caller") {
+            webrtc.requestRenegotiation(payload.fromUserId, !!payload.iceRestart);
+            logger.log("renegotiate_request_applied", { from: payload.fromUserId, iceRestart: !!payload.iceRestart });
+          }
+          break;
+        }
+
         case "end-call": {
           logger.log("remote_end_call", { from: payload.fromUserId });
           toast.info("Звонок завершён");
@@ -310,13 +336,94 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return new Promise<ReturnType<typeof supabase.channel>>((resolve) => {
+    return new Promise<ReturnType<typeof supabase.channel>>((resolve, reject) => {
+      let hasSubscribed = false;
+
       channel.subscribe((status) => {
-        logger.log("channel_status", { status, convId });
-        if (status === "SUBSCRIBED") { channelRef.current = channel; resolve(channel); }
+        logger.log("signaling_channel_status", { status, convId, isReconnect });
+
+        if (status === "SUBSCRIBED") {
+          hasSubscribed = true;
+          channelRef.current = channel;
+          signalingReconnectAttemptsRef.current = 0;
+          signalingReconnectInProgressRef.current = false;
+          clearSignalingReconnectTimer();
+          resolve(channel);
+          return;
+        }
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          if (!hasSubscribed) {
+            reject(new Error(`signaling_${status.toLowerCase()}`));
+            return;
+          }
+
+          if (callStateRef.current === "idle" || signalingReconnectInProgressRef.current) return;
+
+          const attempt = signalingReconnectAttemptsRef.current + 1;
+          if (attempt > MAX_SIGNALING_RECONNECT_ATTEMPTS) {
+            logger.log("signaling_reconnect_exhausted", { convId, status });
+            handleConnectionLost();
+            return;
+          }
+
+          signalingReconnectAttemptsRef.current = attempt;
+          signalingReconnectInProgressRef.current = true;
+          const delay = Math.min(1000 * 2 ** (attempt - 1), 8000);
+          logger.log("signaling_reconnect_scheduled", { convId, status, attempt, delay });
+
+          clearSignalingReconnectTimer();
+          signalingReconnectTimerRef.current = setTimeout(async () => {
+            signalingReconnectTimerRef.current = null;
+
+            try {
+              await setupSignalingChannel(convId, true);
+              logger.log("signaling_reconnect_success", { convId, attempt });
+
+              const recoveredChannel = channelRef.current;
+              if (!recoveredChannel || !user || callStateRef.current !== "active") return;
+
+              if (callRoleRef.current === "caller") {
+                for (const p of participants) {
+                  if (p.userId === user.id) continue;
+                  webrtc.ensurePeerConnection(
+                    p.userId,
+                    makeIceSender(recoveredChannel, user.id, p.userId),
+                    handleConnectionLost,
+                  );
+                  webrtc.requestRenegotiation(p.userId, false);
+                }
+              } else if (caller?.userId) {
+                await sendCallSignal(recoveredChannel, {
+                  type: "renegotiate-request",
+                  fromUserId: user.id,
+                  targetUserId: caller.userId,
+                  signalId: `renegotiate-${Date.now()}`,
+                });
+              }
+            } catch (e: any) {
+              signalingReconnectInProgressRef.current = false;
+              logger.log("signaling_reconnect_failed", { convId, attempt, error: e?.message });
+            }
+          }, delay);
+        }
       });
     });
-  }, [user, webrtc, cleanupCall, clearRingTimeout, logger, makeIceSender, handleConnectionLost, setCallStateTracked, startHeartbeat]);
+  }, [
+    user,
+    webrtc,
+    cleanupCall,
+    clearRingTimeout,
+    logger,
+    makeIceSender,
+    handleConnectionLost,
+    setCallStateTracked,
+    startHeartbeat,
+    clearSignalingReconnectTimer,
+    sendCallSignal,
+    participants,
+    caller,
+  ]);
 
   // ── Incoming call listener ──
   useEffect(() => {
@@ -341,7 +448,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.log("incoming_call", { callerId: payload.callerId, callType: payload.callType, conversationId: payload.conversationId });
 
       callRoleRef.current = "callee";
-      offerSentRef.current = false;
       setCallStateTracked("incoming");
       setCallType(payload.callType);
       setIsGroupCall(payload.isGroup);
@@ -368,7 +474,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         Notification.requestPermission();
       }
 
-      await setupSignalingChannel(payload.conversationId);
+      try {
+        await setupSignalingChannel(payload.conversationId);
+      } catch (e: any) {
+        logger.log("incoming_signaling_setup_failed", { error: e?.message });
+        cleanupCall();
+        return;
+      }
 
       ringTimeoutRef.current = setTimeout(() => {
         if (callStateRef.current === "incoming") {
@@ -398,7 +510,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     callRoleRef.current = "caller";
-    offerSentRef.current = false;
     setCallStateTracked("outgoing");
     setCallType(type);
     setIsGroupCall(isGroup);
@@ -410,7 +521,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).select("id").single();
     if (log) setCallLogId(log.id);
 
-    await setupSignalingChannel(convId);
+    try {
+      await setupSignalingChannel(convId);
+    } catch (e: any) {
+      logger.log("outgoing_signaling_setup_failed", { error: e?.message });
+      toast.error("Не удалось подключить signaling канал");
+      cleanupCall();
+      return;
+    }
 
     const { data: profile } = await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("user_id", user.id).maybeSingle();
     const callerName = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown";
