@@ -32,7 +32,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Check platform_admin role
   const { data: roleData } = await supabaseAdmin
     .from("user_roles")
     .select("role")
@@ -59,7 +58,6 @@ Deno.serve(async (req) => {
           .select("id, name, created_at, status")
           .order("created_at", { ascending: false });
 
-        // Get member counts and team counts
         const enriched = await Promise.all(
           (companies || []).map(async (c) => {
             const { count: memberCount } = await supabaseAdmin
@@ -84,14 +82,12 @@ Deno.serve(async (req) => {
       case "get_company_details": {
         const { company_id } = params;
 
-        // Get teams
         const { data: teams } = await supabaseAdmin
           .from("teams")
           .select("id, name")
           .eq("company_id", company_id)
           .order("name");
 
-        // Get all members with profiles
         const { data: members } = await supabaseAdmin
           .from("company_members")
           .select("id, user_id, role, status")
@@ -104,7 +100,6 @@ Deno.serve(async (req) => {
           .select("user_id, first_name, last_name, position, team, avatar_url")
           .in("user_id", userIds.length > 0 ? userIds : ["none"]);
 
-        // Get emails from auth
         const usersWithEmail = await Promise.all(
           (members || []).map(async (m) => {
             const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(m.user_id);
@@ -121,6 +116,140 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "create_company": {
+        const { name, owner_email, owner_password } = params;
+
+        // Create user for the owner
+        const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
+          email: owner_email,
+          password: owner_password,
+          email_confirm: true,
+        });
+
+        if (createUserError) throw createUserError;
+
+        // Create company
+        const { data: company, error: companyError } = await supabaseAdmin
+          .from("companies")
+          .insert({ name, owner_id: newUser.user.id })
+          .select()
+          .single();
+
+        if (companyError) throw companyError;
+
+        // Add owner as approved admin member
+        await supabaseAdmin
+          .from("company_members")
+          .insert({ company_id: company.id, user_id: newUser.user.id, status: "approved", role: "admin" });
+
+        // Update user_roles to admin
+        await supabaseAdmin
+          .from("user_roles")
+          .update({ role: "admin" })
+          .eq("user_id", newUser.user.id);
+
+        // Update profile with company_id
+        await supabaseAdmin
+          .from("profiles")
+          .update({ company_id: company.id })
+          .eq("user_id", newUser.user.id);
+
+        // Audit log
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_user_id: user.id,
+          action: "create_company",
+          target_type: "company",
+          target_id: company.id,
+          details: { name, owner_email },
+        });
+
+        result = { success: true, company_id: company.id };
+        break;
+      }
+
+      case "create_company_existing_owner": {
+        const { name, owner_user_id } = params;
+
+        // Create company with existing user as owner
+        const { data: company, error: companyError } = await supabaseAdmin
+          .from("companies")
+          .insert({ name, owner_id: owner_user_id })
+          .select()
+          .single();
+
+        if (companyError) throw companyError;
+
+        // Add owner as approved admin member
+        await supabaseAdmin
+          .from("company_members")
+          .insert({ company_id: company.id, user_id: owner_user_id, status: "approved", role: "admin" });
+
+        // Update user_roles to admin
+        await supabaseAdmin
+          .from("user_roles")
+          .update({ role: "admin" })
+          .eq("user_id", owner_user_id);
+
+        // Update profile
+        await supabaseAdmin
+          .from("profiles")
+          .update({ company_id: company.id })
+          .eq("user_id", owner_user_id);
+
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_user_id: user.id,
+          action: "create_company",
+          target_type: "company",
+          target_id: company.id,
+          details: { name, owner_user_id },
+        });
+
+        result = { success: true, company_id: company.id };
+        break;
+      }
+
+      case "suspend_company": {
+        const { company_id } = params;
+        const { error } = await supabaseAdmin
+          .from("companies")
+          .update({ status: "suspended" })
+          .eq("id", company_id);
+
+        if (error) throw error;
+
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_user_id: user.id,
+          action: "suspend_company",
+          target_type: "company",
+          target_id: company_id,
+          details: {},
+        });
+
+        result = { success: true };
+        break;
+      }
+
+      case "activate_company": {
+        const { company_id } = params;
+        const { error } = await supabaseAdmin
+          .from("companies")
+          .update({ status: "active" })
+          .eq("id", company_id);
+
+        if (error) throw error;
+
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_user_id: user.id,
+          action: "activate_company",
+          target_type: "company",
+          target_id: company_id,
+          details: {},
+        });
+
+        result = { success: true };
+        break;
+      }
+
       case "update_company_name": {
         const { company_id, name } = params;
         const { error } = await supabaseAdmin
@@ -130,7 +259,6 @@ Deno.serve(async (req) => {
 
         if (error) throw error;
 
-        // Audit log
         await supabaseAdmin.from("admin_audit_logs").insert({
           admin_user_id: user.id,
           action: "update_company_name",
@@ -203,7 +331,6 @@ Deno.serve(async (req) => {
           .select("user_id, first_name, last_name, company_id")
           .or(`first_name.ilike.${q},last_name.ilike.${q}`);
 
-        // Search by email via auth admin
         const { data: { users: allUsers } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
         const emailMatches = (allUsers || [])
           .filter((u) => u.email?.toLowerCase().includes(query.toLowerCase()))
