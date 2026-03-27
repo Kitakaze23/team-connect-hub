@@ -77,8 +77,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const processedSignalsRef = useRef<Set<string>>(new Set());
   const callRoleRef = useRef<"caller" | "callee" | null>(null);
 
-  // Wire logger
+  // Wire logger + userId
   useEffect(() => { webrtc.setLogger(logger.log); }, [webrtc.setLogger, logger.log]);
+  useEffect(() => { if (user?.id) webrtc.setMyUserId(user.id); }, [user?.id, webrtc.setMyUserId]);
 
   const setCallStateTracked = useCallback((s: CallState) => {
     logger.log("state_change", { from: callStateRef.current, to: s });
