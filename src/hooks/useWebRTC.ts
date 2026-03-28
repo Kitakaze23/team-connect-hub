@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from "react";
-import { ICE_CONFIG, ICE_RESTART_COOLDOWN_MS, DISCONNECT_GRACE_MS } from "./webrtc/iceConfig";
+import { ICE_CONFIG, ICE_RESTART_COOLDOWN_MS, DISCONNECT_GRACE_MS, MAX_ICE_RESTARTS } from "./webrtc/iceConfig";
 import { acquireMedia } from "./webrtc/mediaConstraints";
-import { applyBitrateLimit, configureSimulcast, type NetworkQuality } from "./webrtc/bitrateControl";
+import { applyBitrateLimit, SIMULCAST_ENCODINGS, type NetworkQuality } from "./webrtc/bitrateControl";
 import { collectStats, clearStatsFor, type NetworkStats } from "./webrtc/networkMonitor";
 import { applyCodecPreferences } from "./webrtc/codecOptimizer";
 
@@ -22,9 +22,12 @@ interface PeerState {
   ignoreOffer: boolean;
   polite: boolean;
   lastIceRestartAt: number;
+  iceRestartCount: number;
   disconnectTimer: ReturnType<typeof setTimeout> | null;
   pendingCandidates: RTCIceCandidateInit[];
   lastQuality: NetworkQuality;
+  // Track if we used simulcast transceiver for video
+  videoTransceiverAdded: boolean;
 }
 
 const parseCandidateType = (c?: string) => c?.match(/\btyp\s([a-z0-9]+)/i)?.[1] ?? "unknown";
@@ -44,6 +47,10 @@ export const useWebRTC = () => {
   const myUserIdRef = useRef<string | null>(null);
   const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Callbacks saved for PC recreation
+  const iceSenderFactoryRef = useRef<Map<string, (candidate: RTCIceCandidate) => void>>(new Map());
+  const disconnectHandlerRef = useRef<Map<string, (() => void) | undefined>>(new Map());
+
   const setLogger = useCallback((fn: LogFn) => { loggerRef.current = fn; }, []);
   const setOfferHandler = useCallback((fn: OfferHandlerFn) => { offerHandlerRef.current = fn; }, []);
   const setMyUserId = useCallback((id: string) => { myUserIdRef.current = id; }, []);
@@ -59,20 +66,65 @@ export const useWebRTC = () => {
     return myId < remoteUserId;
   }, []);
 
-  // ── Add local tracks to PC ──
-  const syncLocalTracks = useCallback((remoteUserId: string, pc: RTCPeerConnection) => {
+  // ── Add local tracks to PC using simulcast transceivers ──
+  const syncLocalTracks = useCallback((remoteUserId: string, pc: RTCPeerConnection, peer: PeerState) => {
     const stream = localStreamRef.current;
     if (!stream) return;
+
     const senders = pc.getSenders();
-    for (const track of stream.getTracks()) {
-      const sender = senders.find(s => s.track?.kind === track.kind);
+
+    // Audio — always use addTrack
+    for (const track of stream.getAudioTracks()) {
+      const sender = senders.find(s => s.track?.kind === "audio");
       if (!sender) {
         pc.addTrack(track, stream);
-        log("track_added", { remoteUserId, kind: track.kind });
+        log("track_added", { remoteUserId, kind: "audio" });
       } else if (sender.track?.id !== track.id) {
         sender.replaceTrack(track).catch(e =>
-          log("replace_track_error", { remoteUserId, kind: track.kind, error: (e as Error)?.message })
+          log("replace_track_error", { remoteUserId, kind: "audio", error: (e as Error)?.message })
         );
+      }
+    }
+
+    // Video — use addTransceiver with simulcast encodings on first add
+    for (const track of stream.getVideoTracks()) {
+      const videoSender = senders.find(s => s.track?.kind === "video");
+      if (!videoSender && !peer.videoTransceiverAdded) {
+        try {
+          pc.addTransceiver(track, {
+            direction: "sendrecv",
+            streams: [stream],
+            sendEncodings: SIMULCAST_ENCODINGS,
+          });
+          peer.videoTransceiverAdded = true;
+          log("simulcast_transceiver_added", {
+            remoteUserId,
+            encodings: SIMULCAST_ENCODINGS.length,
+            rids: SIMULCAST_ENCODINGS.map(e => e.rid),
+          });
+        } catch (e: any) {
+          // Fallback to addTrack if addTransceiver with encodings fails
+          log("simulcast_transceiver_fallback", { remoteUserId, error: e?.message });
+          pc.addTrack(track, stream);
+          log("track_added", { remoteUserId, kind: "video" });
+        }
+      } else if (videoSender && videoSender.track?.id !== track.id) {
+        videoSender.replaceTrack(track).catch(e =>
+          log("replace_track_error", { remoteUserId, kind: "video", error: (e as Error)?.message })
+        );
+      } else if (!videoSender && peer.videoTransceiverAdded) {
+        // Transceiver exists but sender lost track reference — find and replace
+        const videoTransceiver = pc.getTransceivers().find(
+          t => t.sender.track === null && t.receiver.track?.kind === "video"
+        );
+        if (videoTransceiver) {
+          videoTransceiver.sender.replaceTrack(track).catch(e =>
+            log("replace_track_error", { remoteUserId, kind: "video", error: (e as Error)?.message })
+          );
+        } else {
+          pc.addTrack(track, stream);
+          log("track_added", { remoteUserId, kind: "video" });
+        }
       }
     }
   }, [log]);
@@ -108,7 +160,7 @@ export const useWebRTC = () => {
     } catch {}
   }, [log]);
 
-  // ── ICE restart with cooldown ──
+  // ── ICE restart with cooldown + max restarts ──
   const triggerIceRestart = useCallback((remoteUserId: string) => {
     const peer = peersRef.current.get(remoteUserId);
     if (!peer || peer.pc.signalingState === "closed") return;
@@ -124,8 +176,16 @@ export const useWebRTC = () => {
       return;
     }
 
+    peer.iceRestartCount++;
+    if (peer.iceRestartCount > MAX_ICE_RESTARTS) {
+      log("ice_restart_max_exceeded_recreating_pc", { remoteUserId, restartCount: peer.iceRestartCount });
+      // Full PC recreation
+      recreatePeerConnection(remoteUserId);
+      return;
+    }
+
     peer.lastIceRestartAt = now;
-    log("ice_restart", { remoteUserId });
+    log("ice_restart", { remoteUserId, attempt: peer.iceRestartCount });
 
     (async () => {
       try {
@@ -140,6 +200,28 @@ export const useWebRTC = () => {
         peer.makingOffer = false;
       }
     })();
+  }, [log]);
+
+  // ── Recreate PeerConnection from scratch ──
+  const recreatePeerConnection = useCallback((remoteUserId: string) => {
+    const oldPeer = peersRef.current.get(remoteUserId);
+    if (oldPeer) {
+      if (oldPeer.disconnectTimer) clearTimeout(oldPeer.disconnectTimer);
+      clearStatsFor(remoteUserId);
+      pc_cleanupHandlers(oldPeer.pc);
+      oldPeer.pc.close();
+      peersRef.current.delete(remoteUserId);
+    }
+
+    log("pc_recreate", { remoteUserId });
+
+    const onIce = iceSenderFactoryRef.current.get(remoteUserId);
+    const onDisconnect = disconnectHandlerRef.current.get(remoteUserId);
+
+    if (onIce) {
+      getOrCreatePeer(remoteUserId, onIce, onDisconnect);
+      // onnegotiationneeded will fire automatically when tracks are synced
+    }
   }, [log]);
 
   // ── Network stats monitoring ──
@@ -169,6 +251,11 @@ export const useWebRTC = () => {
 
         // Apply adaptive bitrate if quality changed
         if (stats.quality !== peer.lastQuality) {
+          log("quality_change", {
+            peerId,
+            from: peer.lastQuality,
+            to: stats.quality,
+          });
           peer.lastQuality = stats.quality;
           await applyBitrateLimit(peer.pc, stats.quality, log);
         }
@@ -199,9 +286,13 @@ export const useWebRTC = () => {
   ): PeerState => {
     const existing = peersRef.current.get(remoteUserId);
     if (existing && existing.pc.signalingState !== "closed") {
-      syncLocalTracks(remoteUserId, existing.pc);
+      syncLocalTracks(remoteUserId, existing.pc, existing);
       return existing;
     }
+
+    // Store callbacks for recreation
+    iceSenderFactoryRef.current.set(remoteUserId, onIceCandidate);
+    disconnectHandlerRef.current.set(remoteUserId, onDisconnected);
 
     const polite = isPolite(remoteUserId);
     log("pc_create", { remoteUserId, polite });
@@ -213,13 +304,12 @@ export const useWebRTC = () => {
       ignoreOffer: false,
       polite,
       lastIceRestartAt: 0,
+      iceRestartCount: 0,
       disconnectTimer: null,
       pendingCandidates: [],
       lastQuality: "unknown",
+      videoTransceiverAdded: false,
     };
-
-    // Apply codec preferences early
-    applyCodecPreferences(pc, log);
 
     // ── onnegotiationneeded — perfect negotiation ──
     pc.onnegotiationneeded = async () => {
@@ -251,12 +341,15 @@ export const useWebRTC = () => {
     };
 
     pc.onicecandidateerror = (event: any) => {
-      log("ice_candidate_error", {
-        remoteUserId,
-        url: event?.url,
-        errorCode: event?.errorCode,
-        errorText: event?.errorText,
-      });
+      // Only log non-trivial errors (error code 701 = STUN timeout, expected for some servers)
+      if (event?.errorCode !== 701) {
+        log("ice_candidate_error", {
+          remoteUserId,
+          url: event?.url,
+          errorCode: event?.errorCode,
+          errorText: event?.errorText,
+        });
+      }
     };
 
     pc.onicegatheringstatechange = () => {
@@ -274,9 +367,11 @@ export const useWebRTC = () => {
       }
 
       if (state === "connected" || state === "completed") {
+        // Reset restart counter on successful connection
+        peer.iceRestartCount = 0;
         void logCandidatePair(remoteUserId, pc);
-        // Configure simulcast + initial bitrate on connection
-        configureSimulcast(pc, log);
+        // Apply codec preferences after connection (transceivers are fully set up)
+        applyCodecPreferences(pc, log);
         startStatsMonitor();
       }
 
@@ -316,19 +411,17 @@ export const useWebRTC = () => {
         remoteUserId,
         kind: event.track.kind,
         readyState: event.track.readyState,
+        streamId: event.streams[0]?.id,
       });
       const stream = event.streams[0];
       if (!stream) return;
 
-      // Listen for track ended to clean up
       event.track.onended = () => {
         log("remote_track_ended", { remoteUserId, kind: event.track.kind });
       };
-
       event.track.onmute = () => {
         log("remote_track_muted", { remoteUserId, kind: event.track.kind });
       };
-
       event.track.onunmute = () => {
         log("remote_track_unmuted", { remoteUserId, kind: event.track.kind });
       };
@@ -340,7 +433,7 @@ export const useWebRTC = () => {
       });
     };
 
-    syncLocalTracks(remoteUserId, pc);
+    syncLocalTracks(remoteUserId, pc, peer);
     peersRef.current.set(remoteUserId, peer);
     return peer;
   }, [isPolite, log, logCandidatePair, syncLocalTracks, triggerIceRestart, startStatsMonitor]);
@@ -365,7 +458,7 @@ export const useWebRTC = () => {
 
     // Sync to all existing PCs
     peersRef.current.forEach((peer, id) => {
-      syncLocalTracks(id, peer.pc);
+      syncLocalTracks(id, peer.pc, peer);
     });
 
     return result.stream;
@@ -529,6 +622,8 @@ export const useWebRTC = () => {
       peer.pc.close();
     });
     peersRef.current.clear();
+    iceSenderFactoryRef.current.clear();
+    disconnectHandlerRef.current.clear();
 
     setRemoteStreams(new Map());
     setIsMuted(false);

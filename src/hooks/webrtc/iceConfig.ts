@@ -46,11 +46,12 @@ const buildIceServers = (): IceServerEntry[] => {
 export const ICE_CONFIG: RTCConfiguration = {
   iceServers: buildIceServers(),
   iceTransportPolicy: "all",
-  iceCandidatePoolSize: 1,
+  iceCandidatePoolSize: 2,
   bundlePolicy: "max-bundle",
   rtcpMuxPolicy: "require",
 };
 
 // Constants for connection resilience
-export const ICE_RESTART_COOLDOWN_MS = 8_000;
+export const ICE_RESTART_COOLDOWN_MS = 10_000;
 export const DISCONNECT_GRACE_MS = 5_000;
+export const MAX_ICE_RESTARTS = 3;  // max restarts before full PC recreation
