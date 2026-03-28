@@ -1,12 +1,3 @@
-/**
- * ICE / TURN server configuration.
- *
- * Servers can be overridden via environment variables:
- *   VITE_TURN_URL, VITE_TURN_USERNAME, VITE_TURN_CREDENTIAL
- *
- * Falls back to Metered TURN relay + Google STUN.
- */
-
 interface IceServerEntry {
   urls: string | string[];
   username?: string;
@@ -15,12 +6,10 @@ interface IceServerEntry {
 
 const buildIceServers = (): IceServerEntry[] => {
   const servers: IceServerEntry[] = [
-    // STUN (Google)
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
   ];
 
-  // Custom TURN from env
   const customUrl = import.meta.env.VITE_TURN_URL;
   const customUser = import.meta.env.VITE_TURN_USERNAME;
   const customCred = import.meta.env.VITE_TURN_CREDENTIAL;
@@ -29,7 +18,6 @@ const buildIceServers = (): IceServerEntry[] => {
     servers.push({ urls: customUrl, username: customUser, credential: customCred });
   }
 
-  // Default Metered TURN relay (free tier — replace in production)
   const meteredUser = "e8dd65a92f3aad1a0cca8cb6";
   const meteredCred = "gEn0smmGOSaoRH0B";
 
@@ -51,7 +39,6 @@ export const ICE_CONFIG: RTCConfiguration = {
   rtcpMuxPolicy: "require",
 };
 
-// Constants for connection resilience
 export const ICE_RESTART_COOLDOWN_MS = 10_000;
 export const DISCONNECT_GRACE_MS = 5_000;
-export const MAX_ICE_RESTARTS = 3;  // max restarts before full PC recreation
+export const MAX_ICE_RESTARTS = 3;
