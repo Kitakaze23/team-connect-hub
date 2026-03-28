@@ -646,6 +646,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMuted: webrtc.isMuted, isCameraOff: webrtc.isCameraOff,
       startCall, acceptCall, rejectCall, endCall,
       toggleMute: webrtc.toggleMute, toggleCamera: webrtc.toggleCamera,
+      switchCamera: webrtc.switchCamera,
     }}>
       {children}
     </CallContext.Provider>
