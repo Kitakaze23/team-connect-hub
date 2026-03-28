@@ -98,9 +98,16 @@ const CallOverlay = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-xl"
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-xl overflow-hidden"
+        style={{ height: '100dvh' }}
       >
-        <div className="relative z-10 flex flex-col items-center w-full h-full max-w-5xl mx-auto px-4 py-6">
+        <div
+          className="relative z-10 flex flex-col items-center w-full h-full max-w-5xl mx-auto px-3 sm:px-4"
+          style={{
+            paddingTop: 'max(12px, env(safe-area-inset-top))',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          }}
+        >
           {/* Incoming Call */}
           {callState === "incoming" && (
             <IncomingCallUI
@@ -129,12 +136,11 @@ const CallOverlay = () => {
 
           {/* Active Call */}
           {callState === "active" && (
-            <div className="flex flex-col items-center w-full h-full gap-3">
+            <div className="flex flex-col items-center w-full h-full gap-2 min-h-0">
               {callType === "video" ? (
-                <div className="flex-1 w-full relative">
-                  {/* Remote video grid */}
+                <div className="flex-1 w-full relative min-h-0 overflow-hidden">
                   <div
-                    className="w-full h-full gap-2"
+                    className="w-full h-full gap-1 sm:gap-2"
                     style={{
                       display: "grid",
                       gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
@@ -142,7 +148,7 @@ const CallOverlay = () => {
                   >
                     {remoteEntries.length > 0 ? (
                       remoteEntries.map(([userId, stream]) => (
-                        <div key={userId} className="relative bg-secondary rounded-2xl overflow-hidden min-h-0">
+                        <div key={userId} className="relative bg-secondary rounded-xl sm:rounded-2xl overflow-hidden min-h-0">
                           <video
                             ref={(node) => {
                               remoteVideoRefs.current.set(userId, node);
@@ -150,76 +156,73 @@ const CallOverlay = () => {
                             }}
                             autoPlay
                             playsInline
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain bg-black"
                           />
                           <ParticipantLabel userId={userId} />
                         </div>
                       ))
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-secondary rounded-2xl">
+                      <div className="w-full h-full flex items-center justify-center bg-secondary rounded-xl sm:rounded-2xl">
                         <AvatarFallback avatar={targetAvatar} initials={initials} size="lg" />
                       </div>
                     )}
                   </div>
 
-                  {/* Local video PiP */}
                   {localStream && (
-                    <div className="absolute bottom-3 right-3 w-28 sm:w-36 aspect-video rounded-xl overflow-hidden border-2 border-border shadow-lg z-10">
+                    <div className="absolute bottom-2 right-2 w-20 sm:w-36 aspect-video rounded-lg sm:rounded-xl overflow-hidden border-2 border-border shadow-lg z-10">
                       <video ref={setLocalVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                       {isCameraOff && (
                         <div className="absolute inset-0 bg-secondary flex items-center justify-center">
-                          <VideoOff className="w-5 h-5 text-muted-foreground" />
+                          <VideoOff className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
                   <AvatarFallback avatar={targetAvatar} initials={initials} size="lg" />
-                  <h2 className="text-xl font-mono font-bold text-foreground">{targetName}</h2>
+                  <h2 className="text-lg sm:text-xl font-mono font-bold text-foreground">{targetName}</h2>
                   {participants.length > 1 && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       +{participants.length - 1} участник(ов)
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Duration */}
-              <div className="text-sm font-mono text-muted-foreground">
+              <div className="text-xs sm:text-sm font-mono text-muted-foreground shrink-0">
                 {formatDuration(callDuration)}
               </div>
 
-              {/* Controls */}
-              <div className="flex gap-3 mt-1 pb-2">
+              <div className="flex gap-2 sm:gap-3 shrink-0 pb-1">
                 <ControlButton active={isMuted} onClick={toggleMute} variant="toggle">
-                  {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                  {isMuted ? <MicOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Mic className="w-5 h-5 sm:w-6 sm:h-6" />}
                 </ControlButton>
 
                 {callType === "video" && (
                   <>
                     <ControlButton active={isCameraOff} onClick={toggleCamera} variant="toggle">
-                      {isCameraOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                      {isCameraOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
                     </ControlButton>
 
                     {isMobileDevice() && (
                       <ControlButton onClick={switchCamera} variant="default">
-                        <SwitchCamera className="w-6 h-6" />
+                        <SwitchCamera className="w-5 h-5 sm:w-6 sm:h-6" />
                       </ControlButton>
                     )}
 
                     <ControlButton onClick={toggleFullscreen} variant="default">
-                      {isFullscreen ? <Minimize className="w-6 h-6" /> : <Maximize className="w-6 h-6" />}
+                      {isFullscreen ? <Minimize className="w-5 h-5 sm:w-6 sm:h-6" /> : <Maximize className="w-5 h-5 sm:w-6 sm:h-6" />}
                     </ControlButton>
                   </>
                 )}
 
                 <button
                   onClick={endCall}
-                  className="w-14 h-14 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
                 >
-                  <PhoneOff className="w-6 h-6" />
+                  <PhoneOff className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
               </div>
             </div>
@@ -272,7 +275,7 @@ const ControlButton = ({
 }) => (
   <button
     onClick={onClick}
-    className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
+    className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-colors ${
       variant === "toggle" && active
         ? "bg-destructive/20 text-destructive"
         : "bg-secondary text-foreground hover:bg-secondary/80"
