@@ -1,26 +1,23 @@
-/**
- * Media constraints with graceful fallback chain:
- *   720p → 480p → audio-only
- */
-
 const VIDEO_IDEAL: MediaTrackConstraints = {
   facingMode: "user",
   width: { ideal: 1280, max: 1920 },
   height: { ideal: 720, max: 1080 },
-  frameRate: { ideal: 24, max: 30 },
+  frameRate: { ideal: 30, max: 30 },
 };
 
 const VIDEO_FALLBACK: MediaTrackConstraints = {
   facingMode: "user",
   width: { ideal: 640 },
   height: { ideal: 480 },
-  frameRate: { ideal: 15, max: 24 },
+  frameRate: { ideal: 24, max: 30 },
 };
 
 const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
+  sampleRate: 48000,
+  channelCount: 1,
 };
 
 export type MediaAcquireResult = {
@@ -28,16 +25,18 @@ export type MediaAcquireResult = {
   videoDowngraded: boolean;
 };
 
-/**
- * Acquire media with automatic fallback to lower resolution on failure.
- */
 export const acquireMedia = async (
   wantVideo: boolean,
   log: (event: string, details?: Record<string, any>) => void,
+  facingMode?: "user" | "environment",
 ): Promise<MediaAcquireResult> => {
+  const videoConstraints = wantVideo
+    ? { ...VIDEO_IDEAL, ...(facingMode ? { facingMode } : {}) }
+    : false;
+
   const constraints: MediaStreamConstraints = {
     audio: AUDIO_CONSTRAINTS,
-    video: wantVideo ? VIDEO_IDEAL : false,
+    video: videoConstraints,
   };
 
   try {
@@ -51,11 +50,12 @@ export const acquireMedia = async (
     if (wantVideo && err.name !== "NotAllowedError") {
       log("media_fallback_attempting", { error: err.name });
 
-      // Try lower resolution
+      const fallbackVideo = { ...VIDEO_FALLBACK, ...(facingMode ? { facingMode } : {}) };
+
       try {
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           audio: AUDIO_CONSTRAINTS,
-          video: VIDEO_FALLBACK,
+          video: fallbackVideo,
         });
         log("media_acquired_fallback", {
           tracks: fallbackStream.getTracks().map(t => `${t.kind}:${t.readyState}`),
@@ -63,7 +63,6 @@ export const acquireMedia = async (
         });
         return { stream: fallbackStream, videoDowngraded: true };
       } catch (fallbackErr: any) {
-        // Try audio-only as last resort
         if (fallbackErr.name !== "NotAllowedError") {
           log("media_fallback_audio_only", { error: fallbackErr.name });
           try {

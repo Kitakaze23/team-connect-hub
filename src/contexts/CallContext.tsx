@@ -33,6 +33,7 @@ interface CallContextType {
   endCall: () => void;
   toggleMute: () => void;
   toggleCamera: () => void;
+  switchCamera: () => Promise<void>;
 }
 
 const CallContext = createContext<CallContextType | null>(null);
@@ -253,24 +254,18 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.log("signal_in", { type: payload.type, from: payload.fromUserId, role: callRoleRef.current });
 
       switch (payload.type) {
-        // ── ACCEPT: callee accepted → caller ensures PC; offer will be created by onnegotiationneeded ──
         case "accept": {
-          if (callRoleRef.current !== "caller") break;
+          // Any participant can receive an accept from a new joiner
           webrtc.ensurePeerConnection(
             payload.fromUserId,
             makeIceSender(channel, user.id, payload.fromUserId),
             handleConnectionLost,
           );
-          logger.log("peer_ready_after_accept", { callee: payload.fromUserId });
+          logger.log("peer_ready_after_accept", { from: payload.fromUserId });
           break;
         }
 
-        // ── OFFER: callee receives offer and creates answer ──
         case "offer": {
-          if (callRoleRef.current !== "callee") {
-            logger.log("offer_ignored_wrong_role", { role: callRoleRef.current });
-            break;
-          }
           try {
             const answer = await webrtc.handleOffer(
               payload.fromUserId, payload.sdp,
@@ -297,11 +292,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           break;
         }
 
-        // ── ANSWER: caller applies answer ──
         case "answer": {
-          if (callRoleRef.current !== "caller") break;
           await webrtc.handleAnswer(payload.fromUserId, payload.sdp);
-          logger.log("answer_applied");
+          logger.log("answer_applied", { from: payload.fromUserId });
           clearRingTimeout();
           if (callStateRef.current !== "active") {
             setCallStateTracked("active");
@@ -316,24 +309,28 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         case "renegotiate-request": {
-          if (callRoleRef.current === "caller") {
-            webrtc.requestRenegotiation(payload.fromUserId, !!payload.iceRestart);
-            logger.log("renegotiate_request_applied", { from: payload.fromUserId, iceRestart: !!payload.iceRestart });
-          }
+          webrtc.requestRenegotiation(payload.fromUserId, !!payload.iceRestart);
+          logger.log("renegotiate_request_applied", { from: payload.fromUserId, iceRestart: !!payload.iceRestart });
           break;
         }
 
         case "end-call": {
           logger.log("remote_end_call", { from: payload.fromUserId });
-          toast.info("Звонок завершён");
-          cleanupCall();
+          if (webrtc.remoteStreams.size > 1) {
+            webrtc.removePeer(payload.fromUserId);
+          } else {
+            toast.info("Звонок завершён");
+            cleanupCall();
+          }
           break;
         }
 
         case "reject": {
           logger.log("remote_reject", { from: payload.fromUserId });
-          toast.info("Звонок отклонён");
-          cleanupCall();
+          if (webrtc.remoteStreams.size <= 1 && callStateRef.current !== "active") {
+            toast.info("Звонок отклонён");
+            cleanupCall();
+          }
           break;
         }
       }
@@ -645,6 +642,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMuted: webrtc.isMuted, isCameraOff: webrtc.isCameraOff,
       startCall, acceptCall, rejectCall, endCall,
       toggleMute: webrtc.toggleMute, toggleCamera: webrtc.toggleCamera,
+      switchCamera: webrtc.switchCamera,
     }}>
       {children}
     </CallContext.Provider>

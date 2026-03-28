@@ -607,6 +607,68 @@ export const useWebRTC = () => {
     setIsCameraOff(prev => !prev);
   }, []);
 
+  const switchCamera = useCallback(async () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    const currentTrack = stream.getVideoTracks()[0];
+    if (!currentTrack) return;
+
+    const settings = currentTrack.getSettings();
+    const newFacingMode = settings.facingMode === "environment" ? "user" : "environment";
+
+    log("switch_camera", { from: settings.facingMode, to: newFacingMode });
+
+    try {
+      const result = await acquireMedia(true, log, newFacingMode);
+      const newStream = result.stream;
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) return;
+
+      // Replace video track in local stream
+      currentTrack.stop();
+      stream.removeTrack(currentTrack);
+      stream.addTrack(newVideoTrack);
+
+      // Replace track on all peer connections
+      for (const [peerId, peer] of peersRef.current) {
+        const sender = peer.pc.getSenders().find(s => s.track?.kind === "video" || (s.track === null && !peer.pc.getSenders().some(ss => ss.track?.kind === "video")));
+        const videoSender = peer.pc.getSenders().find(s => s.track?.kind === "video");
+        if (videoSender) {
+          await videoSender.replaceTrack(newVideoTrack);
+          log("camera_switched_on_peer", { peerId });
+        }
+      }
+
+      // Stop audio tracks from the new stream (we keep existing audio)
+      newStream.getAudioTracks().forEach(t => t.stop());
+
+      setLocalStream(new MediaStream(stream.getTracks()));
+      log("camera_switched", { facingMode: newFacingMode });
+    } catch (e: any) {
+      log("switch_camera_error", { error: e?.message });
+    }
+  }, [log]);
+
+  const removePeer = useCallback((remoteUserId: string) => {
+    const peer = peersRef.current.get(remoteUserId);
+    if (peer) {
+      if (peer.disconnectTimer) clearTimeout(peer.disconnectTimer);
+      clearStatsFor(remoteUserId);
+      pc_cleanupHandlers(peer.pc);
+      peer.pc.close();
+      peersRef.current.delete(remoteUserId);
+      iceSenderFactoryRef.current.delete(remoteUserId);
+      disconnectHandlerRef.current.delete(remoteUserId);
+    }
+    setRemoteStreams(prev => {
+      const next = new Map(prev);
+      next.delete(remoteUserId);
+      return next;
+    });
+    log("peer_removed", { remoteUserId });
+  }, [log]);
+
   const cleanup = useCallback(() => {
     log("cleanup");
     stopStatsMonitor();
@@ -647,6 +709,8 @@ export const useWebRTC = () => {
     handleIceCandidate,
     toggleMute,
     toggleCamera,
+    switchCamera,
+    removePeer,
     cleanup,
     setLogger,
     setOfferHandler,
