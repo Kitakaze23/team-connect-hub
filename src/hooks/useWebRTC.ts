@@ -710,6 +710,7 @@ export const useWebRTC = () => {
     toggleMute,
     toggleCamera,
     switchCamera,
+    removePeer,
     cleanup,
     setLogger,
     setOfferHandler,

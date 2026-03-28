@@ -316,9 +316,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         case "end-call": {
           logger.log("remote_end_call", { from: payload.fromUserId });
-          // In group calls, only remove the peer, don't end the whole call
-          if (remoteStreams.size > 1) {
-            webrtc.removePeer?.(payload.fromUserId);
+          if (webrtc.remoteStreams.size > 1) {
+            webrtc.removePeer(payload.fromUserId);
           } else {
             toast.info("Звонок завершён");
             cleanupCall();
@@ -328,7 +327,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         case "reject": {
           logger.log("remote_reject", { from: payload.fromUserId });
-          if (remoteStreams.size <= 1 && callStateRef.current !== "active") {
+          if (webrtc.remoteStreams.size <= 1 && callStateRef.current !== "active") {
             toast.info("Звонок отклонён");
             cleanupCall();
           }
