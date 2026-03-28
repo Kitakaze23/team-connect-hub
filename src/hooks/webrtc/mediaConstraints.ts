@@ -1,5 +1,6 @@
 /**
- * Media constraints with graceful fallback.
+ * Media constraints with graceful fallback chain:
+ *   720p → 480p → audio-only
  */
 
 const VIDEO_IDEAL: MediaTrackConstraints = {
@@ -47,9 +48,10 @@ export const acquireMedia = async (
     });
     return { stream, videoDowngraded: false };
   } catch (err: any) {
-    // If video failed, try lower resolution
     if (wantVideo && err.name !== "NotAllowedError") {
       log("media_fallback_attempting", { error: err.name });
+
+      // Try lower resolution
       try {
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           audio: AUDIO_CONSTRAINTS,

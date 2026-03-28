@@ -2,7 +2,8 @@
  * WebRTC stats monitoring and network quality classification.
  *
  * Uses pc.getStats() to track packet loss, jitter, RTT, and bitrate.
- * Classifies network as good / medium / poor.
+ * Classifies network as good / medium / poor with hysteresis
+ * to prevent rapid oscillation between quality levels.
  */
 
 import type { NetworkQuality } from "./bitrateControl";
@@ -27,10 +28,18 @@ interface PrevStats {
   timestamp: number;
 }
 
-const prevStatsMap = new Map<string, PrevStats>();
+// ── Hysteresis state ──
+interface QualityHistory {
+  prev: PrevStats | null;
+  recentQualities: NetworkQuality[];
+}
+
+const peerHistory = new Map<string, QualityHistory>();
+
+const HYSTERESIS_WINDOW = 3; // number of samples before switching quality
 
 export const clearStatsFor = (peerId: string) => {
-  prevStatsMap.delete(peerId);
+  peerHistory.delete(peerId);
 };
 
 /**
@@ -41,6 +50,8 @@ export const collectStats = async (
   pc: RTCPeerConnection,
 ): Promise<NetworkStats | null> => {
   if (pc.connectionState === "closed") return null;
+
+  const history = peerHistory.get(peerId) ?? { prev: null, recentQualities: [] };
 
   try {
     const stats = await pc.getStats();
@@ -96,7 +107,7 @@ export const collectStats = async (
     });
 
     const now = Date.now();
-    const prev = prevStatsMap.get(peerId);
+    const prev = history.prev;
 
     let bitrateSend = 0;
     let bitrateRecv = 0;
@@ -115,11 +126,19 @@ export const collectStats = async (
       }
     }
 
-    prevStatsMap.set(peerId, {
-      bytesSent, bytesRecv, packetsSent, packetsLost, timestamp: now,
-    });
+    history.prev = { bytesSent, bytesRecv, packetsSent, packetsLost, timestamp: now };
 
-    const quality = classifyQuality(rtt, jitter, packetLoss);
+    // Raw quality from current sample
+    const rawQuality = classifyQuality(rtt, jitter, packetLoss);
+
+    // Apply hysteresis — only change quality if consistent across window
+    history.recentQualities.push(rawQuality);
+    if (history.recentQualities.length > HYSTERESIS_WINDOW) {
+      history.recentQualities.shift();
+    }
+
+    const quality = computeHysteresisQuality(history.recentQualities);
+    peerHistory.set(peerId, history);
 
     return {
       quality, rtt, jitter, packetLoss,
@@ -136,10 +155,29 @@ export const collectStats = async (
  * Classify quality based on key metrics.
  */
 const classifyQuality = (rttMs: number, jitterMs: number, lossPercent: number): NetworkQuality => {
-  // Poor: high RTT or packet loss
   if (rttMs > 400 || lossPercent > 10 || jitterMs > 100) return "poor";
-  // Medium: moderate issues
   if (rttMs > 150 || lossPercent > 3 || jitterMs > 50) return "medium";
-  // Good
   return "good";
+};
+
+/**
+ * Apply hysteresis: only switch quality level if the majority of recent
+ * samples agree. This prevents rapid oscillation.
+ */
+const computeHysteresisQuality = (samples: NetworkQuality[]): NetworkQuality => {
+  if (samples.length === 0) return "unknown";
+  if (samples.length < HYSTERESIS_WINDOW) return samples[samples.length - 1];
+
+  const counts: Record<NetworkQuality, number> = { good: 0, medium: 0, poor: 0, unknown: 0 };
+  for (const s of samples) counts[s]++;
+
+  // Downgrade immediately if any "poor" appears (safety first)
+  if (counts.poor >= 1) return "poor";
+
+  // Upgrade requires majority
+  const majority = Math.ceil(HYSTERESIS_WINDOW / 2);
+  if (counts.good >= majority) return "good";
+  if (counts.medium >= majority) return "medium";
+
+  return samples[samples.length - 1];
 };
