@@ -54,6 +54,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, membership } = useAuth();
   const webrtc = useWebRTC();
   const logger = useCallLogger();
+  const { sendPushToUsers } = usePushNotifications(user?.id);
 
   const [callState, setCallState] = useState<CallState>("idle");
   const callStateRef = useRef<CallState>("idle");
