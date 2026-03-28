@@ -29,7 +29,7 @@ export const applyCodecPreferences = (
       if (kind === "video" || transceiver.mid === "1") {
         // Prefer H.264 > VP8 > VP9 > others
         const sorted = [...capabilities.codecs].sort((a, b) => {
-          const priority = (codec: RTCRtpCodecCapability) => {
+          const priority = (codec: { mimeType: string }) => {
             const mime = codec.mimeType.toLowerCase();
             if (mime.includes("h264")) return 0;
             if (mime.includes("vp8")) return 1;
