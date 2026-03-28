@@ -690,6 +690,7 @@ export const useWebRTC = () => {
     handleIceCandidate,
     toggleMute,
     toggleCamera,
+    switchCamera,
     cleanup,
     setLogger,
     setOfferHandler,
