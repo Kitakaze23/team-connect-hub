@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useCallLogger } from "@/hooks/useCallLogger";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
 
 export type CallState = "idle" | "outgoing" | "incoming" | "active";
@@ -53,6 +54,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, membership } = useAuth();
   const webrtc = useWebRTC();
   const logger = useCallLogger();
+  const { sendPushToUsers } = usePushNotifications(user?.id);
 
   const [callState, setCallState] = useState<CallState>("idle");
   const callStateRef = useRef<CallState>("idle");
@@ -551,6 +553,18 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
     }
+
+    // Web Push fallback for offline users
+    const callLabel = type === "video" ? "Видеозвонок" : "Аудиозвонок";
+    sendPushToUsers(
+      targetUsers.map((t) => t.userId),
+      {
+        type: "call",
+        title: `${callLabel} от ${callerName}`,
+        body: "Нажмите, чтобы ответить",
+        data: { url: "/app", conversationId: convId, callType: type },
+      }
+    );
 
     ringTimeoutRef.current = setTimeout(() => {
       if (callStateRef.current !== "outgoing") return;
