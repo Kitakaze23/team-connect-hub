@@ -1,38 +1,12 @@
 import { useCallback, useRef, useState, useEffect } from "react";
-
-// ── ICE / TURN configuration ──
-const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    {
-      urls: "turn:a.relay.metered.ca:80",
-      username: "e8dd65a92f3aad1a0cca8cb6",
-      credential: "gEn0smmGOSaoRH0B",
-    },
-    {
-      urls: "turn:a.relay.metered.ca:80?transport=tcp",
-      username: "e8dd65a92f3aad1a0cca8cb6",
-      credential: "gEn0smmGOSaoRH0B",
-    },
-    {
-      urls: "turn:a.relay.metered.ca:443",
-      username: "e8dd65a92f3aad1a0cca8cb6",
-      credential: "gEn0smmGOSaoRH0B",
-    },
-    {
-      urls: "turns:a.relay.metered.ca:443?transport=tcp",
-      username: "e8dd65a92f3aad1a0cca8cb6",
-      credential: "gEn0smmGOSaoRH0B",
-    },
-  ],
-  iceTransportPolicy: "all",
-  iceCandidatePoolSize: 1,
-};
+import { ICE_CONFIG, ICE_RESTART_COOLDOWN_MS, DISCONNECT_GRACE_MS } from "./webrtc/iceConfig";
+import { acquireMedia } from "./webrtc/mediaConstraints";
+import { applyBitrateLimit, configureSimulcast, type NetworkQuality } from "./webrtc/bitrateControl";
+import { collectStats, clearStatsFor, type NetworkStats } from "./webrtc/networkMonitor";
+import { applyCodecPreferences } from "./webrtc/codecOptimizer";
 
 // ── Constants ──
-const ICE_RESTART_COOLDOWN_MS = 8_000;
-const DISCONNECT_GRACE_MS = 5_000;
+const STATS_INTERVAL_MS = 5_000;
 
 type LogFn = (event: string, details?: Record<string, any>) => void;
 type OfferHandlerFn = (
@@ -48,8 +22,9 @@ interface PeerState {
   ignoreOffer: boolean;
   polite: boolean;
   lastIceRestartAt: number;
-  disconnectTimer: NodeJS.Timeout | null;
+  disconnectTimer: ReturnType<typeof setTimeout> | null;
   pendingCandidates: RTCIceCandidateInit[];
+  lastQuality: NetworkQuality;
 }
 
 const parseCandidateType = (c?: string) => c?.match(/\btyp\s([a-z0-9]+)/i)?.[1] ?? "unknown";
@@ -62,10 +37,12 @@ export const useWebRTC = () => {
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>("unknown");
 
   const loggerRef = useRef<LogFn>(() => {});
   const offerHandlerRef = useRef<OfferHandlerFn | null>(null);
   const myUserIdRef = useRef<string | null>(null);
+  const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setLogger = useCallback((fn: LogFn) => { loggerRef.current = fn; }, []);
   const setOfferHandler = useCallback((fn: OfferHandlerFn) => { offerHandlerRef.current = fn; }, []);
@@ -131,6 +108,89 @@ export const useWebRTC = () => {
     } catch {}
   }, [log]);
 
+  // ── ICE restart with cooldown ──
+  const triggerIceRestart = useCallback((remoteUserId: string) => {
+    const peer = peersRef.current.get(remoteUserId);
+    if (!peer || peer.pc.signalingState === "closed") return;
+
+    const now = Date.now();
+    if (now - peer.lastIceRestartAt < ICE_RESTART_COOLDOWN_MS) {
+      log("ice_restart_cooldown", { remoteUserId, elapsed: now - peer.lastIceRestartAt });
+      return;
+    }
+
+    if (peer.makingOffer) {
+      log("ice_restart_deferred_making_offer", { remoteUserId });
+      return;
+    }
+
+    peer.lastIceRestartAt = now;
+    log("ice_restart", { remoteUserId });
+
+    (async () => {
+      try {
+        peer.makingOffer = true;
+        const offer = await peer.pc.createOffer({ iceRestart: true });
+        await peer.pc.setLocalDescription(offer);
+        log("ice_restart_offer_created", { remoteUserId });
+        offerHandlerRef.current?.(remoteUserId, peer.pc.localDescription!, { iceRestart: true });
+      } catch (e: any) {
+        log("ice_restart_error", { remoteUserId, error: e?.message });
+      } finally {
+        peer.makingOffer = false;
+      }
+    })();
+  }, [log]);
+
+  // ── Network stats monitoring ──
+  const startStatsMonitor = useCallback(() => {
+    if (statsTimerRef.current) return;
+
+    statsTimerRef.current = setInterval(async () => {
+      let worstQuality: NetworkQuality = "good";
+
+      for (const [peerId, peer] of peersRef.current) {
+        if (peer.pc.connectionState !== "connected") continue;
+
+        const stats = await collectStats(peerId, peer.pc);
+        if (!stats) continue;
+
+        log("network_stats", {
+          peerId,
+          quality: stats.quality,
+          rtt: Math.round(stats.rtt),
+          jitter: Math.round(stats.jitter * 10) / 10,
+          packetLoss: Math.round(stats.packetLoss * 10) / 10,
+          bitrateSend: Math.round(stats.bitrateSend / 1000),
+          bitrateRecv: Math.round(stats.bitrateRecv / 1000),
+          localCandidate: stats.localCandidateType,
+          remoteCandidate: stats.remoteCandidateType,
+        });
+
+        // Apply adaptive bitrate if quality changed
+        if (stats.quality !== peer.lastQuality) {
+          peer.lastQuality = stats.quality;
+          await applyBitrateLimit(peer.pc, stats.quality, log);
+        }
+
+        // Track worst quality across all peers
+        const qualityOrder: NetworkQuality[] = ["good", "medium", "poor"];
+        if (qualityOrder.indexOf(stats.quality) > qualityOrder.indexOf(worstQuality)) {
+          worstQuality = stats.quality;
+        }
+      }
+
+      setNetworkQuality(worstQuality);
+    }, STATS_INTERVAL_MS);
+  }, [log]);
+
+  const stopStatsMonitor = useCallback(() => {
+    if (statsTimerRef.current) {
+      clearInterval(statsTimerRef.current);
+      statsTimerRef.current = null;
+    }
+  }, []);
+
   // ── Create PeerConnection with perfect negotiation ──
   const getOrCreatePeer = useCallback((
     remoteUserId: string,
@@ -146,7 +206,7 @@ export const useWebRTC = () => {
     const polite = isPolite(remoteUserId);
     log("pc_create", { remoteUserId, polite });
 
-    const pc = new RTCPeerConnection(ICE_SERVERS);
+    const pc = new RTCPeerConnection(ICE_CONFIG);
     const peer: PeerState = {
       pc,
       makingOffer: false,
@@ -155,7 +215,11 @@ export const useWebRTC = () => {
       lastIceRestartAt: 0,
       disconnectTimer: null,
       pendingCandidates: [],
+      lastQuality: "unknown",
     };
+
+    // Apply codec preferences early
+    applyCodecPreferences(pc, log);
 
     // ── onnegotiationneeded — perfect negotiation ──
     pc.onnegotiationneeded = async () => {
@@ -204,7 +268,6 @@ export const useWebRTC = () => {
       const state = pc.iceConnectionState;
       log("ice_state", { remoteUserId, state });
 
-      // Clear any pending disconnect timer
       if (peer.disconnectTimer) {
         clearTimeout(peer.disconnectTimer);
         peer.disconnectTimer = null;
@@ -212,10 +275,12 @@ export const useWebRTC = () => {
 
       if (state === "connected" || state === "completed") {
         void logCandidatePair(remoteUserId, pc);
+        // Configure simulcast + initial bitrate on connection
+        configureSimulcast(pc, log);
+        startStatsMonitor();
       }
 
       if (state === "disconnected") {
-        // Grace period — ICE may recover on its own
         peer.disconnectTimer = setTimeout(() => {
           if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
             log("disconnect_grace_expired", { remoteUserId, currentState: pc.iceConnectionState });
@@ -254,6 +319,20 @@ export const useWebRTC = () => {
       });
       const stream = event.streams[0];
       if (!stream) return;
+
+      // Listen for track ended to clean up
+      event.track.onended = () => {
+        log("remote_track_ended", { remoteUserId, kind: event.track.kind });
+      };
+
+      event.track.onmute = () => {
+        log("remote_track_muted", { remoteUserId, kind: event.track.kind });
+      };
+
+      event.track.onunmute = () => {
+        log("remote_track_unmuted", { remoteUserId, kind: event.track.kind });
+      };
+
       setRemoteStreams(prev => {
         const next = new Map(prev);
         next.set(remoteUserId, stream);
@@ -264,41 +343,7 @@ export const useWebRTC = () => {
     syncLocalTracks(remoteUserId, pc);
     peersRef.current.set(remoteUserId, peer);
     return peer;
-  }, [isPolite, log, logCandidatePair, syncLocalTracks]);
-
-  // ── ICE restart with cooldown ──
-  const triggerIceRestart = useCallback((remoteUserId: string) => {
-    const peer = peersRef.current.get(remoteUserId);
-    if (!peer || peer.pc.signalingState === "closed") return;
-
-    const now = Date.now();
-    if (now - peer.lastIceRestartAt < ICE_RESTART_COOLDOWN_MS) {
-      log("ice_restart_cooldown", { remoteUserId, elapsed: now - peer.lastIceRestartAt });
-      return;
-    }
-
-    if (peer.makingOffer) {
-      log("ice_restart_deferred_making_offer", { remoteUserId });
-      return;
-    }
-
-    peer.lastIceRestartAt = now;
-    log("ice_restart", { remoteUserId });
-
-    (async () => {
-      try {
-        peer.makingOffer = true;
-        const offer = await peer.pc.createOffer({ iceRestart: true });
-        await peer.pc.setLocalDescription(offer);
-        log("ice_restart_offer_created", { remoteUserId });
-        offerHandlerRef.current?.(remoteUserId, peer.pc.localDescription!, { iceRestart: true });
-      } catch (e: any) {
-        log("ice_restart_error", { remoteUserId, error: e?.message });
-      } finally {
-        peer.makingOffer = false;
-      }
-    })();
-  }, [log]);
+  }, [isPolite, log, logCandidatePair, syncLocalTracks, triggerIceRestart, startStatsMonitor]);
 
   // ── Get media ──
   const getMedia = useCallback(async (video: boolean) => {
@@ -310,27 +355,20 @@ export const useWebRTC = () => {
       tracks.forEach(t => t.stop());
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-        video: video
-          ? { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }
-          : false,
-      });
-      localStreamRef.current = stream;
-      setLocalStream(stream);
-      log("media_acquired", { tracks: stream.getTracks().map(t => `${t.kind}:${t.readyState}`) });
+    const result = await acquireMedia(video, log);
+    localStreamRef.current = result.stream;
+    setLocalStream(result.stream);
 
-      // Sync to all existing PCs
-      peersRef.current.forEach((peer, id) => {
-        syncLocalTracks(id, peer.pc);
-      });
-
-      return stream;
-    } catch (err: any) {
-      log("media_error", { name: err?.name, message: err?.message });
-      throw new Error(err?.name === "NotAllowedError" ? "no_permission" : "media_error");
+    if (result.videoDowngraded) {
+      log("media_quality_downgraded", { videoDowngraded: true });
     }
+
+    // Sync to all existing PCs
+    peersRef.current.forEach((peer, id) => {
+      syncLocalTracks(id, peer.pc);
+    });
+
+    return result.stream;
   }, [log, syncLocalTracks]);
 
   // ── Ensure PC exists ──
@@ -352,7 +390,6 @@ export const useWebRTC = () => {
     const peer = getOrCreatePeer(remoteUserId, onIceCandidate, onDisconnected);
     const pc = peer.pc;
 
-    // Perfect negotiation: detect glare
     const offerCollision = peer.makingOffer || pc.signalingState !== "stable";
     peer.ignoreOffer = !peer.polite && offerCollision;
 
@@ -362,7 +399,6 @@ export const useWebRTC = () => {
     }
 
     try {
-      // If we have a local offer pending and we're polite, rollback
       if (offerCollision) {
         log("glare_rollback", { remoteUserId });
       }
@@ -425,10 +461,7 @@ export const useWebRTC = () => {
       transport: parseCandidateTransport(candidate?.candidate),
     });
 
-    if (!peer) {
-      // No peer yet — will be created later, but we can't buffer without a peer
-      return;
-    }
+    if (!peer) return;
 
     if (peer.pc.remoteDescription?.type) {
       try {
@@ -441,11 +474,10 @@ export const useWebRTC = () => {
       return;
     }
 
-    // Buffer until remote description is set
     peer.pendingCandidates.push(candidate);
   }, [log]);
 
-  // ── Request renegotiation (for signaling recovery) ──
+  // ── Request renegotiation ──
   const requestRenegotiation = useCallback((remoteUserId: string, iceRestart = false) => {
     const peer = peersRef.current.get(remoteUserId);
     if (!peer || peer.pc.signalingState === "closed") return;
@@ -453,7 +485,6 @@ export const useWebRTC = () => {
     if (iceRestart) {
       triggerIceRestart(remoteUserId);
     } else {
-      // Just trigger negotiation
       if (peer.makingOffer || peer.pc.signalingState !== "stable") {
         log("renegotiation_deferred", { remoteUserId, signalingState: peer.pc.signalingState });
         return;
@@ -485,20 +516,16 @@ export const useWebRTC = () => {
 
   const cleanup = useCallback(() => {
     log("cleanup");
+    stopStatsMonitor();
+
     localStreamRef.current?.getTracks().forEach(t => t.stop());
     localStreamRef.current = null;
     setLocalStream(null);
 
-    peersRef.current.forEach(peer => {
+    peersRef.current.forEach((peer, peerId) => {
       if (peer.disconnectTimer) clearTimeout(peer.disconnectTimer);
-      peer.pc.onicecandidate = null;
-      peer.pc.onicecandidateerror = null;
-      peer.pc.onicegatheringstatechange = null;
-      peer.pc.oniceconnectionstatechange = null;
-      peer.pc.onconnectionstatechange = null;
-      peer.pc.onsignalingstatechange = null;
-      peer.pc.ontrack = null;
-      peer.pc.onnegotiationneeded = null;
+      clearStatsFor(peerId);
+      pc_cleanupHandlers(peer.pc);
       peer.pc.close();
     });
     peersRef.current.clear();
@@ -506,7 +533,8 @@ export const useWebRTC = () => {
     setRemoteStreams(new Map());
     setIsMuted(false);
     setIsCameraOff(false);
-  }, [log]);
+    setNetworkQuality("unknown");
+  }, [log, stopStatsMonitor]);
 
   useEffect(() => () => { cleanup(); }, [cleanup]);
 
@@ -515,6 +543,7 @@ export const useWebRTC = () => {
     remoteStreams,
     isMuted,
     isCameraOff,
+    networkQuality,
     getMedia,
     ensurePeerConnection,
     requestRenegotiation,
@@ -529,3 +558,15 @@ export const useWebRTC = () => {
     setMyUserId,
   };
 };
+
+// ── Helper: remove all handlers from a PC to avoid leaks ──
+function pc_cleanupHandlers(pc: RTCPeerConnection) {
+  pc.onicecandidate = null;
+  pc.onicecandidateerror = null;
+  pc.onicegatheringstatechange = null;
+  pc.oniceconnectionstatechange = null;
+  pc.onconnectionstatechange = null;
+  pc.onsignalingstatechange = null;
+  pc.ontrack = null;
+  pc.onnegotiationneeded = null;
+}
