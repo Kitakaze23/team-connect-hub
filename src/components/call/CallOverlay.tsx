@@ -98,9 +98,16 @@ const CallOverlay = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-xl"
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-xl overflow-hidden"
+        style={{ height: '100dvh' }}
       >
-        <div className="relative z-10 flex flex-col items-center w-full h-full max-w-5xl mx-auto px-4 py-6">
+        <div
+          className="relative z-10 flex flex-col items-center w-full h-full max-w-5xl mx-auto px-3 sm:px-4"
+          style={{
+            paddingTop: 'max(12px, env(safe-area-inset-top))',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          }}
+        >
           {/* Incoming Call */}
           {callState === "incoming" && (
             <IncomingCallUI
