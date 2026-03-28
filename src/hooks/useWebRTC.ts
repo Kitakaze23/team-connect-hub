@@ -650,6 +650,25 @@ export const useWebRTC = () => {
     }
   }, [log]);
 
+  const removePeer = useCallback((remoteUserId: string) => {
+    const peer = peersRef.current.get(remoteUserId);
+    if (peer) {
+      if (peer.disconnectTimer) clearTimeout(peer.disconnectTimer);
+      clearStatsFor(remoteUserId);
+      pc_cleanupHandlers(peer.pc);
+      peer.pc.close();
+      peersRef.current.delete(remoteUserId);
+      iceSenderFactoryRef.current.delete(remoteUserId);
+      disconnectHandlerRef.current.delete(remoteUserId);
+    }
+    setRemoteStreams(prev => {
+      const next = new Map(prev);
+      next.delete(remoteUserId);
+      return next;
+    });
+    log("peer_removed", { remoteUserId });
+  }, [log]);
+
   const cleanup = useCallback(() => {
     log("cleanup");
     stopStatsMonitor();
