@@ -554,6 +554,18 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
+    // Web Push fallback for offline users
+    const callLabel = type === "video" ? "Видеозвонок" : "Аудиозвонок";
+    sendPushToUsers(
+      targetUsers.map((t) => t.userId),
+      {
+        type: "call",
+        title: `${callLabel} от ${callerName}`,
+        body: "Нажмите, чтобы ответить",
+        data: { url: "/app", conversationId: convId, callType: type },
+      }
+    );
+
     ringTimeoutRef.current = setTimeout(() => {
       if (callStateRef.current !== "outgoing") return;
       logger.log("ring_timeout_outgoing");
