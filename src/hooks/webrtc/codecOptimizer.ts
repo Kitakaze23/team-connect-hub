@@ -54,7 +54,7 @@ export const applyCodecPreferences = (
       if (kind === "audio" || transceiver.mid === "0") {
         // Prefer Opus
         const sorted = [...capabilities.codecs].sort((a, b) => {
-          const isOpus = (c: RTCRtpCodecCapability) =>
+          const isOpus = (c: { mimeType: string }) =>
             c.mimeType.toLowerCase().includes("opus") ? 0 : 1;
           return isOpus(a) - isOpus(b);
         });
