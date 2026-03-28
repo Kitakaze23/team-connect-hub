@@ -275,7 +275,7 @@ const ControlButton = ({
 }) => (
   <button
     onClick={onClick}
-    className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
+    className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-colors ${
       variant === "toggle" && active
         ? "bg-destructive/20 text-destructive"
         : "bg-secondary text-foreground hover:bg-secondary/80"
