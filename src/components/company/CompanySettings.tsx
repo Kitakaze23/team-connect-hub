@@ -71,7 +71,7 @@ const CompanySettings = () => {
 
     const { data: company } = await supabase
       .from("companies")
-      .select("name, invite_code, sprint_length_days, sprint_start_date, backlog_enabled")
+      .select("name, invite_code, sprint_length_days, sprint_start_date, backlog_enabled, chat_enabled, calls_enabled")
       .eq("id", companyId)
       .single();
 
@@ -81,6 +81,8 @@ const CompanySettings = () => {
       setSprintLengthDays(company.sprint_length_days || 14);
       setSprintStartDate(company.sprint_start_date || "");
       setBacklogEnabled(company.backlog_enabled !== false);
+      setChatEnabled((company as any).chat_enabled !== false);
+      setCallsEnabled((company as any).calls_enabled !== false);
     }
 
     const { data: allMembers } = await supabase
