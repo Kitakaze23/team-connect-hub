@@ -27,6 +27,7 @@ interface CallContextType {
   remoteStreams: Map<string, MediaStream>;
   isMuted: boolean;
   isCameraOff: boolean;
+  callsEnabled: boolean;
   startCall: (conversationId: string, type: CallType, targetUsers: CallParticipant[], isGroup: boolean) => Promise<void>;
   acceptCall: () => Promise<void>;
   rejectCall: () => void;
