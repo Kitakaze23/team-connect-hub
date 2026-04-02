@@ -361,6 +361,8 @@ export type Database = {
       companies: {
         Row: {
           backlog_enabled: boolean
+          calls_enabled: boolean
+          chat_enabled: boolean
           created_at: string
           desk_sharing_enabled: boolean
           floor_plan_url: string | null
@@ -375,6 +377,8 @@ export type Database = {
         }
         Insert: {
           backlog_enabled?: boolean
+          calls_enabled?: boolean
+          chat_enabled?: boolean
           created_at?: string
           desk_sharing_enabled?: boolean
           floor_plan_url?: string | null
@@ -389,6 +393,8 @@ export type Database = {
         }
         Update: {
           backlog_enabled?: boolean
+          calls_enabled?: boolean
+          chat_enabled?: boolean
           created_at?: string
           desk_sharing_enabled?: boolean
           floor_plan_url?: string | null
