@@ -27,6 +27,8 @@ const Dashboard = () => {
   const isMobile = useIsMobile();
   const { membership } = useAuth();
   const [backlogEnabled, setBacklogEnabled] = useState(true);
+  const [chatEnabled, setChatEnabled] = useState(true);
+  const [callsEnabled, setCallsEnabled] = useState(true);
 
   const isAdmin = membership?.role === "admin";
 
