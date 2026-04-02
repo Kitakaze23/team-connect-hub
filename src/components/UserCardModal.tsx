@@ -117,7 +117,7 @@ const UserCardModal = ({ user, onClose }: Props) => {
           </div>
 
           {/* Call buttons */}
-          {targetUserId && !isSelf && (
+          {targetUserId && !isSelf && callsEnabled && (
             <div className="flex gap-2">
               <button
                 onClick={() => handleCall("audio")}
