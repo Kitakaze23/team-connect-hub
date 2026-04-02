@@ -95,6 +95,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // Token refresh failed — clear stale state so user can re-login
+        if (event === "TOKEN_REFRESHED" && !session) {
+          setSession(null);
+          setUser(null);
+          setMembership(null);
+          setMembershipLoading(false);
+          setIsPlatformAdmin(false);
+          setLoading(false);
+          return;
+        }
+
+        if (event === "SIGNED_OUT") {
+          setSession(null);
+          setUser(null);
+          setMembership(null);
+          setMembershipLoading(false);
+          setIsPlatformAdmin(false);
+          setLoading(false);
+          return;
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -120,7 +141,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      // If session retrieval fails (expired/invalid token), sign out cleanly
+      if (error || (!session && currentUserRef.current)) {
+        supabase.auth.signOut().catch(() => {});
+        setSession(null);
+        setUser(null);
+        setMembership(null);
+        setMembershipLoading(false);
+        setIsPlatformAdmin(false);
+        setLoading(false);
+        return;
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
