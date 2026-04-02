@@ -27,6 +27,7 @@ interface CallContextType {
   remoteStreams: Map<string, MediaStream>;
   isMuted: boolean;
   isCameraOff: boolean;
+  callsEnabled: boolean;
   startCall: (conversationId: string, type: CallType, targetUsers: CallParticipant[], isGroup: boolean) => Promise<void>;
   acceptCall: () => Promise<void>;
   rejectCall: () => void;
@@ -66,6 +67,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
   const [callLogId, setCallLogId] = useState<string | null>(null);
+  const [callsEnabled, setCallsEnabled] = useState(true);
+
+  useEffect(() => {
+    if (!membership?.company_id) return;
+    supabase.from("companies").select("calls_enabled").eq("id", membership.company_id).single().then(({ data }) => {
+      if (data) setCallsEnabled((data as any).calls_enabled !== false);
+    });
+  }, [membership?.company_id]);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -639,7 +648,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <CallContext.Provider value={{
       callState, callType, isGroupCall, participants, caller, conversationId, callDuration,
       localStream: webrtc.localStream, remoteStreams: webrtc.remoteStreams,
-      isMuted: webrtc.isMuted, isCameraOff: webrtc.isCameraOff,
+      isMuted: webrtc.isMuted, isCameraOff: webrtc.isCameraOff, callsEnabled,
       startCall, acceptCall, rejectCall, endCall,
       toggleMute: webrtc.toggleMute, toggleCamera: webrtc.toggleCamera,
       switchCamera: webrtc.switchCamera,

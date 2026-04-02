@@ -27,6 +27,8 @@ const Dashboard = () => {
   const isMobile = useIsMobile();
   const { membership } = useAuth();
   const [backlogEnabled, setBacklogEnabled] = useState(true);
+  const [chatEnabled, setChatEnabled] = useState(true);
+  const [callsEnabled, setCallsEnabled] = useState(true);
 
   const isAdmin = membership?.role === "admin";
 
@@ -39,14 +41,18 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!membership?.company_id) return;
-    supabase.from("companies").select("backlog_enabled").eq("id", membership.company_id).single().then(({ data }) => {
-      if (data) setBacklogEnabled(data.backlog_enabled);
+    supabase.from("companies").select("backlog_enabled, chat_enabled, calls_enabled").eq("id", membership.company_id).single().then(({ data }) => {
+      if (data) {
+        setBacklogEnabled(data.backlog_enabled);
+        setChatEnabled((data as any).chat_enabled !== false);
+        setCallsEnabled((data as any).calls_enabled !== false);
+      }
     });
   }, [membership?.company_id]);
 
   const tabConfig = [
     { id: "team" as Tab, label: "Команда", icon: Users },
-    { id: "chat" as Tab, label: "Чат", icon: MessageSquare },
+    ...(chatEnabled ? [{ id: "chat" as Tab, label: "Чат", icon: MessageSquare }] : []),
     ...(backlogEnabled ? [{ id: "backlog" as Tab, label: "Бэклог", icon: LayoutList }] : []),
     { id: "profile" as Tab, label: "Профиль", icon: UserCircle },
     ...(isAdmin ? [{ id: "settings" as Tab, label: "Настройки", icon: Settings }] : []),

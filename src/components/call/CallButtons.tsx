@@ -8,7 +8,9 @@ interface CallButtonsProps {
 }
 
 const CallButtons = ({ conversationId, targetUsers, isGroup = false }: CallButtonsProps) => {
-  const { startCall, callState } = useCall();
+  const { startCall, callState, callsEnabled } = useCall();
+
+  if (!callsEnabled) return null;
 
   const handleCall = (type: CallType) => {
     if (callState !== "idle") return;
