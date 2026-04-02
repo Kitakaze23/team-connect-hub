@@ -41,8 +41,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!membership?.company_id) return;
-    supabase.from("companies").select("backlog_enabled").eq("id", membership.company_id).single().then(({ data }) => {
-      if (data) setBacklogEnabled(data.backlog_enabled);
+    supabase.from("companies").select("backlog_enabled, chat_enabled, calls_enabled").eq("id", membership.company_id).single().then(({ data }) => {
+      if (data) {
+        setBacklogEnabled(data.backlog_enabled);
+        setChatEnabled((data as any).chat_enabled !== false);
+        setCallsEnabled((data as any).calls_enabled !== false);
+      }
     });
   }, [membership?.company_id]);
 
