@@ -25,7 +25,7 @@ interface Props {
 
 const UserCardModal = ({ user, onClose }: Props) => {
   const StatusIcon = statusIcons[user.status];
-  const { startCall, callState } = useCall();
+  const { startCall, callState, callsEnabled } = useCall();
   const { user: currentUser, membership } = useAuth();
   const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
 
