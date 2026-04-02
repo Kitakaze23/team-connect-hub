@@ -55,6 +55,8 @@ const CompanySettings = () => {
   const [sprintLengthDays, setSprintLengthDays] = useState(14);
   const [sprintStartDate, setSprintStartDate] = useState("");
   const [backlogEnabled, setBacklogEnabled] = useState(true);
+  const [chatEnabled, setChatEnabled] = useState(true);
+  const [callsEnabled, setCallsEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chats, setChats] = useState<ChatConversation[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
