@@ -397,7 +397,49 @@ const CompanySettings = () => {
 
   const renderChatsSection = () => (
     <div className="space-y-4">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl p-6 space-y-3">
+      {/* Toggles */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl p-6 space-y-4">
+        <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" /> Настройки чатов и звонков
+        </h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-foreground">Чаты</p>
+            <p className="text-xs text-muted-foreground">Показывать вкладку «Чат» для всех участников</p>
+          </div>
+          <button
+            onClick={async () => {
+              const next = !chatEnabled;
+              setChatEnabled(next);
+              await supabase.from("companies").update({ chat_enabled: next } as any).eq("id", companyId);
+              toast({ title: next ? "Чаты включены" : "Чаты отключены" });
+            }}
+            className={`w-11 h-6 rounded-full transition-colors relative ${chatEnabled ? "bg-accent" : "bg-secondary"}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${chatEnabled ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-foreground">Звонки</p>
+            <p className="text-xs text-muted-foreground">Разрешить аудио и видеозвонки</p>
+          </div>
+          <button
+            onClick={async () => {
+              const next = !callsEnabled;
+              setCallsEnabled(next);
+              await supabase.from("companies").update({ calls_enabled: next } as any).eq("id", companyId);
+              toast({ title: next ? "Звонки включены" : "Звонки отключены" });
+            }}
+            className={`w-11 h-6 rounded-full transition-colors relative ${callsEnabled ? "bg-accent" : "bg-secondary"}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${callsEnabled ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Chat management */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-card border border-border rounded-2xl p-6 space-y-3">
         <h3 className="text-sm font-mono font-semibold text-foreground flex items-center gap-2">
           <MessageSquare className="w-4 h-4" /> Управление чатами
         </h3>
